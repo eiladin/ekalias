@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/eiladin/ekalias/aws"
 	"github.com/eiladin/ekalias/console"
 )
 
@@ -28,7 +29,5 @@ func findContexts() []string {
 
 func SelectContext() string {
 	contexts := findContexts()
-	return console.SelectValueFromList(contexts, "Kube Context", func() string {
-		return "This is a new KubeContext"
-	})
+	return console.SelectValueFromList(contexts, "Kube Context", aws.CreateKubeContext)
 }

@@ -13,14 +13,18 @@ import (
 
 func SelectValueFromList(list []string, description string, newFunc func() string) string {
 	var result string
-	max := len(list)
 	for result == "" {
-		for i, item := range list {
+		max := 0
+		for _, item := range list {
 			if item != "" {
-				fmt.Printf("%d. %s\n", i+1, item)
+				max++
+				fmt.Printf("%d. %s\n", max, item)
 			}
 		}
-		fmt.Printf("%d. %s\n", max, "Create New")
+		if newFunc != nil {
+			max++
+			fmt.Printf("%d. %s\n", max, "Create New")
+		}
 
 		fmt.Printf("\nSelect %s [%d-%d]: ", description, 1, max)
 		reader := bufio.NewReader(os.Stdin)
@@ -37,7 +41,7 @@ func SelectValueFromList(list []string, description string, newFunc func() strin
 			if i > max || i < 1 {
 				fmt.Println(errInvalidInput)
 			} else {
-				if i == max {
+				if i == max && newFunc != nil {
 					result = newFunc()
 				} else {
 					result = list[i-1]

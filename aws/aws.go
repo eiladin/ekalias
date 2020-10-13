@@ -2,6 +2,7 @@ package aws
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -74,7 +75,53 @@ func createNew() string {
 	return newProfile
 }
 
+type clusterlist struct {
+	Clusters []string
+}
+
+func CreateKubeContext() string {
+	var context string
+	var region string
+	aws := findAWS()
+	for context == "" {
+		fmt.Print("AWS Region: ")
+		reader := bufio.NewReader(os.Stdin)
+		r, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatal(err)
+		}
+		region = strings.Replace(r, "\n", "", -1)
+
+		out, err := exec.Command(aws, "eks", "list-clusters", "--region", region).Output()
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		cl := clusterlist{}
+		err = json.Unmarshal(out, &cl)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if len(cl.Clusters) > 0 {
+			context = console.SelectValueFromList(cl.Clusters, "Cluster", nil)
+		}
+	}
+
+	out, err := exec.Command(aws, "eks", "update-kubeconfig", "--region", region, "--name", context).Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	s := strings.Split(string(out), " ")
+	if s[0] == "Added" {
+		return s[3]
+	} else {
+		return s[2]
+	}
+}
+
 func SelectProfile() string {
 	awsprofiles := findProfiles()
-	return console.SelectValueFromList(awsprofiles, "AWS Profile", createNew)
+	selectedProfile := console.SelectValueFromList(awsprofiles, "AWS Profile", createNew)
+	os.Setenv("AWS_PROFILE", selectedProfile)
+	return selectedProfile
 }
