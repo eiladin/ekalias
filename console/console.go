@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -27,12 +28,7 @@ func SelectValueFromList(list []string, description string, newFunc func() strin
 		}
 
 		fmt.Printf("\nSelect %s [%d-%d]: ", description, 1, max)
-		reader := bufio.NewReader(os.Stdin)
-		r, err := reader.ReadString('\n')
-		if err != nil {
-			log.Fatal(err)
-		}
-		r = strings.Replace(r, "\n", "", -1)
+		r := ReadInput()
 		i, err := strconv.Atoi(r)
 		errInvalidInput := aurora.Red(fmt.Sprintf("invalid input -- valid selections: 1-%d\n", max))
 		if err != nil {
@@ -54,4 +50,21 @@ func SelectValueFromList(list []string, description string, newFunc func() strin
 
 func BuildAlias(aliasname, awsProfile, kubeContext string) string {
 	return fmt.Sprintf(`alias %s="export AWS_PROFILE=%s && kubectl config use-context %s"`, aliasname, awsProfile, kubeContext)
+}
+
+func ReadInput() string {
+	reader := bufio.NewReader(os.Stdin)
+	r, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatal(err)
+	}
+	return strings.Replace(r, "\n", "", -1)
+}
+
+func ExecCommand(name string, arg ...string) string {
+	out, err := exec.Command(name, arg...).Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(out)
 }

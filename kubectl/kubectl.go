@@ -19,11 +19,8 @@ func findKubectl() string {
 
 func findContexts() []string {
 	kubectl := findKubectl()
-	out, err := exec.Command(kubectl, "config", "get-contexts", "-o", "name").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	contexts := strings.Split(string(out), "\n")
+	out := console.ExecCommand(kubectl, "config", "get-contexts", "-o", "name")
+	contexts := strings.Split(out, "\n")
 	return contexts
 }
 

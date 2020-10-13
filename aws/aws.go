@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -23,11 +22,8 @@ func findAWS() string {
 
 func findProfiles() []string {
 	aws := findAWS()
-	out, err := exec.Command(aws, "configure", "list-profiles").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	profiles := strings.Split(string(out), "\n")
+	out := console.ExecCommand(aws, "configure", "list-profiles")
+	profiles := strings.Split(out, "\n")
 	return profiles
 }
 
@@ -44,12 +40,7 @@ func createNew() string {
 	var newProfile string
 	for newProfile == "" {
 		fmt.Print("AWS Profile Name: ")
-		reader := bufio.NewReader(os.Stdin)
-		r, err := reader.ReadString('\n')
-		if err != nil {
-			log.Fatal(err)
-		}
-		r = strings.Replace(r, "\n", "", -1)
+		r := console.ReadInput()
 		if len(strings.Split(r, " ")) > 1 {
 			fmt.Println(aurora.Red("invalid input, profile name cannot have spaces"))
 		} else if profileExists(r) {
@@ -85,20 +76,10 @@ func CreateKubeContext() string {
 	aws := findAWS()
 	for context == "" {
 		fmt.Print("AWS Region: ")
-		reader := bufio.NewReader(os.Stdin)
-		r, err := reader.ReadString('\n')
-		if err != nil {
-			log.Fatal(err)
-		}
-		region = strings.Replace(r, "\n", "", -1)
-
-		out, err := exec.Command(aws, "eks", "list-clusters", "--region", region).Output()
-		if err != nil {
-			fmt.Println(err)
-		}
-
+		region := console.ReadInput()
+		out := console.ExecCommand(aws, "eks", "list-clusters", "--region", region)
 		cl := clusterlist{}
-		err = json.Unmarshal(out, &cl)
+		err := json.Unmarshal([]byte(out), &cl)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -108,22 +89,14 @@ func CreateKubeContext() string {
 	}
 
 	fmt.Print("Kube Context Alias: ")
-	reader := bufio.NewReader(os.Stdin)
-	r, err := reader.ReadString('\n')
-	if err != nil {
-		log.Fatal(err)
-	}
-	alias := strings.Replace(r, "\n", "", -1)
-	var out []byte
+	alias := console.ReadInput()
+	var out string
 	if len(alias) > 0 {
-		out, err = exec.Command(aws, "eks", "update-kubeconfig", "--region", region, "--name", context, "--alias", alias).Output()
+		out = console.ExecCommand(aws, "eks", "update-kubeconfig", "--region", region, "--name", context, "--alias", alias)
 	} else {
-		out, err = exec.Command(aws, "eks", "update-kubeconfig", "--region", region, "--name", context).Output()
+		out = console.ExecCommand(aws, "eks", "update-kubeconfig", "--region", region, "--name", context)
 	}
-	if err != nil {
-		log.Fatal(err)
-	}
-	s := strings.Split(string(out), " ")
+	s := strings.Split(out, " ")
 	if s[0] == "Added" {
 		return s[3]
 	} else {
