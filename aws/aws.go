@@ -107,7 +107,19 @@ func CreateKubeContext() string {
 		}
 	}
 
-	out, err := exec.Command(aws, "eks", "update-kubeconfig", "--region", region, "--name", context).Output()
+	fmt.Print("Kube Context Alias: ")
+	reader := bufio.NewReader(os.Stdin)
+	r, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatal(err)
+	}
+	alias := strings.Replace(r, "\n", "", -1)
+	var out []byte
+	if len(alias) > 0 {
+		out, err = exec.Command(aws, "eks", "update-kubeconfig", "--region", region, "--name", context, "--alias", alias).Output()
+	} else {
+		out, err = exec.Command(aws, "eks", "update-kubeconfig", "--region", region, "--name", context).Output()
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
