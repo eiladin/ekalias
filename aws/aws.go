@@ -76,7 +76,7 @@ func CreateKubeContext() string {
 	aws := findAWS()
 	for context == "" {
 		fmt.Print("AWS Region: ")
-		region := console.ReadInput()
+		region = console.ReadInput()
 		out := console.ExecCommand(aws, "eks", "list-clusters", "--region", region)
 		cl := clusterlist{}
 		err := json.Unmarshal([]byte(out), &cl)
@@ -90,18 +90,24 @@ func CreateKubeContext() string {
 
 	fmt.Print("Kube Context Alias: ")
 	alias := console.ReadInput()
-	var out string
+	args := []string{"eks", "update-kubeconfig", "--region", region, "--name", context}
+	var contextName string
+
 	if len(alias) > 0 {
-		out = console.ExecCommand(aws, "eks", "update-kubeconfig", "--region", region, "--name", context, "--alias", alias)
-	} else {
-		out = console.ExecCommand(aws, "eks", "update-kubeconfig", "--region", region, "--name", context)
+		contextName = alias
+		args = append(args, "--alias", alias)
 	}
+	out := console.ExecCommand(aws, args...)
 	s := strings.Split(out, " ")
-	if s[0] == "Added" {
-		return s[3]
-	} else {
-		return s[2]
+
+	if contextName == "" {
+		for _, item := range s {
+			if strings.HasPrefix(item, "arn:aws") {
+				contextName = item
+			}
+		}
 	}
+	return contextName
 }
 
 func SelectProfile() string {
