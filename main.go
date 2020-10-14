@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/eiladin/ekalias/aws"
@@ -11,6 +12,16 @@ import (
 )
 
 func main() {
+	k := kubectl.FindKubectl()
+	if k != "" {
+		log.Fatal("Unable to find kubectl")
+	}
+
+	a := aws.FindAWS()
+	if a != "" {
+		log.Fatal("Unable to find aws cli")
+	}
+
 	args := os.Args[1:]
 	if len(args) != 1 {
 		fmt.Println("Usage: ekalias <alias name>")
