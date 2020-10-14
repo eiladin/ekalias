@@ -13,12 +13,12 @@ import (
 
 func main() {
 	k := kubectl.FindKubectl()
-	if k != "" {
+	if k == "" {
 		log.Fatal("Unable to find kubectl")
 	}
 
 	a := aws.FindAWS()
-	if a != "" {
+	if a == "" {
 		log.Fatal("Unable to find aws cli")
 	}
 
