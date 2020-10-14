@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/eiladin/ekalias/mocks"
@@ -58,9 +59,11 @@ func (suite ConsoleSuite) TestExecCommand() {
 
 func (suite ConsoleSuite) TestExecInteractive() {
 	e := DefaultExecutor{}
+	path, err := exec.LookPath("echo")
+	suite.NoError(err)
 
 	res := mocks.ReadStdOut(func() {
-		err := e.ExecInteractive("/usr/bin/echo", "hello", "world")
+		err := e.ExecInteractive(path, "hello", "world")
 		suite.NoError(err)
 	})
 
