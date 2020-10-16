@@ -7,5 +7,5 @@ ekalias <new alias>
 ```
 
 ## Demo
-![](./demo.gif)
 
+[![asciicast](https://asciinema.org/a/365780.png)](https://asciinema.org/a/365780?speed=2&autoplay=1)

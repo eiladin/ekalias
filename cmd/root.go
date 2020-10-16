@@ -8,7 +8,7 @@ import (
 	"github.com/eiladin/ekalias/aws"
 	"github.com/eiladin/ekalias/console"
 	"github.com/eiladin/ekalias/kubectl"
-	"github.com/logrusorgru/aurora"
+	"github.com/logrusorgru/aurora/v3"
 	"github.com/spf13/cobra"
 )
 
