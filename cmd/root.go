@@ -38,19 +38,22 @@ func newRootCmd(version string) *rootCmd {
 			return validateArgs(args)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			k := kubectl.FindKubectl()
-			if k == "" {
+			k := kubectl.Create(nil)
+			aws := aws.Create(nil)
+
+			kubectl := k.FindCli()
+			if kubectl == "" {
 				log.Fatal("Unable to find kubectl")
 			}
 
-			a := aws.FindAWS()
+			a := aws.FindCli()
 			if a == "" {
 				log.Fatal("Unable to find aws cli")
 			}
 
 			awsProfile := aws.SelectProfile()
 			fmt.Println("")
-			kubeContext := kubectl.SelectContext()
+			kubeContext := k.SelectContext()
 			fmt.Println("")
 			fmt.Println(aurora.Green(console.BuildAlias(args[0], awsProfile, kubeContext)))
 		},

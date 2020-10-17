@@ -7,19 +7,32 @@ import (
 	"github.com/eiladin/ekalias/console"
 )
 
-var executor console.Executor = console.DefaultExecutor{}
-
-func FindKubectl() string {
-	return executor.FindExecutable("kubectl")
+type Kubectl struct {
+	executor console.Executor
 }
 
-func findContexts() []string {
-	kubectl := FindKubectl()
-	out := executor.ExecCommand(kubectl, "config", "get-contexts", "-o", "name")
+func Create(e console.Executor) Kubectl {
+	k := Kubectl{
+		executor: e,
+	}
+	if k.executor == nil {
+		k.executor = console.DefaultExecutor{}
+	}
+	return k
+}
+
+func (k Kubectl) FindCli() string {
+	return k.executor.FindExecutable("kubectl")
+}
+
+func (k Kubectl) findContexts() []string {
+	kubectl := k.FindCli()
+	out := k.executor.ExecCommand(kubectl, "config", "get-contexts", "-o", "name")
 	return strings.Split(out, "\n")
 }
 
-func SelectContext() string {
-	contexts := findContexts()
-	return console.SelectValueFromList(executor, contexts, "Kube Context", aws.CreateKubeContext)
+func (k Kubectl) SelectContext() string {
+	contexts := k.findContexts()
+	aws := aws.Create(k.executor)
+	return console.SelectValueFromList(k.executor, contexts, "Kube Context", aws.CreateKubeContext)
 }

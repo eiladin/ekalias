@@ -21,24 +21,25 @@ func TestAWSSuite(t *testing.T) {
 	suite.Run(t, new(AWSSuite))
 }
 
-func (suite AWSSuite) TestFindAWS() {
-	res := FindAWS()
-	suite.NotEmpty(res)
+func (suite AWSSuite) TestFindCli() {
+	a := Create(mocks.NewExecutor())
+	res := a.FindCli()
+	suite.Equal("aws", res)
 }
 
 func (suite AWSSuite) TestFindProfiles() {
 	e := mocks.NewExecutor()
 	e.On("ExecCommand", "aws", "configure", "list-profiles").Return("a\nb\nc")
-	executor = e
+	a := Create(e)
 
-	res := findProfiles()
+	res := a.findProfiles()
 	suite.Equal(3, len(res))
 }
 
 func (suite AWSSuite) TestProfileExists() {
 	e := mocks.NewExecutor()
 	e.On("ExecCommand", "aws", "configure", "list-profiles").Return("a\nb\nc")
-	executor = e
+	a := Create(e)
 
 	cases := []struct {
 		profile string
@@ -49,12 +50,12 @@ func (suite AWSSuite) TestProfileExists() {
 	}
 
 	for _, c := range cases {
-		res := profileExists(c.profile)
+		res := a.profileExists(c.profile)
 		suite.Equal(c.exists, res)
 	}
 }
 
-func (suite AWSSuite) TestCreateNew() {
+func (suite AWSSuite) TestCreateProfile() {
 	cases := []struct {
 		existingProfiles string
 		newProfile       string
@@ -92,10 +93,10 @@ func (suite AWSSuite) TestCreateNew() {
 		e.On("ExecCommand", "aws", "configure", "list-profiles").Return(c.existingProfiles)
 		e.On("ExecInteractive", "aws", "configure", "--profile", c.newProfile).Return(c.interactiveErr)
 		e.On("ReadInput").Return(c.newProfile)
-		executor = e
+		a := Create(e)
 
 		mocks.ReadStdOut(func() {
-			res, err := createNew()
+			res, err := a.CreateProfile()
 			if c.shouldErr {
 				suite.Error(err)
 			} else {
@@ -156,9 +157,9 @@ func (suite AWSSuite) TestCreateKubeContext() {
 		e.On("ExecCommand", "aws", "eks", "list-clusters", "--region", c.region).Return(c.clusterlist)
 		e.On("ExecCommand", "aws", "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName).Return(fmt.Sprintf("Updated context arn:aws:eks:%s:accountID:cluster/%s in /home/user/.kube/config", c.region, c.selectedClusterName))
 		e.On("ExecCommand", "aws", "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName, "--alias", c.alias).Return(fmt.Sprintf("Updated context %s in /home/user/.kube/config", c.alias))
-		executor = e
+		a := Create(e)
 		mocks.ReadStdOut(func() {
-			res, err := CreateKubeContext()
+			res, err := a.CreateKubeContext()
 			suite.Equal(res, c.expectedResult)
 			if c.expectedError != false {
 				suite.Error(err)
@@ -173,10 +174,10 @@ func (suite AWSSuite) TestSelectProfile() {
 	e := mocks.NewExecutor()
 	e.On("ExecCommand", "aws", "configure", "list-profiles").Return("a\nb\nc")
 	e.On("ReadInput").Return("1")
-	executor = e
+	a := Create(e)
 
 	mocks.ReadStdOut(func() {
-		res := SelectProfile()
+		res := a.SelectProfile()
 		suite.Equal("a", res)
 		suite.Equal("a", os.Getenv("AWS_PROFILE"))
 	})
