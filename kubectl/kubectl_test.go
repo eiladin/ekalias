@@ -20,9 +20,9 @@ func TestAWSSuite(t *testing.T) {
 func (suite KubectlSuite) TestFindContexts() {
 	e := mocks.NewExecutor()
 	e.On("ExecCommand", "kubectl", "config", "get-contexts", "-o", "name").Return("a\nb\nc")
-	executor = e
+	k := Create(e)
 	mocks.ReadStdOut(func() {
-		res := findContexts()
+		res := k.findContexts()
 		suite.Len(res, 3)
 	})
 }
@@ -31,17 +31,17 @@ func (suite KubectlSuite) TestSelectContext() {
 	e := mocks.NewExecutor()
 	e.On("ExecCommand", "kubectl", "config", "get-contexts", "-o", "name").Return("a\nb\nc")
 	e.On("ReadInput").Return("2")
-	executor = e
+	k := Create(e)
 
 	mocks.ReadStdOut(func() {
-		res := SelectContext()
+		res := k.SelectContext()
 		suite.Equal("b", res)
 	})
 }
 
-func (suite KubectlSuite) TestFindKubectl() {
-	executor = mocks.NewExecutor()
+func (suite KubectlSuite) TestFindCli() {
+	k := Create(mocks.NewExecutor())
 
-	res := FindKubectl()
+	res := k.FindCli()
 	suite.Equal("kubectl", res)
 }
