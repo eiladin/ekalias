@@ -11,8 +11,8 @@ import (
 
 func NewExecutor() *Executor {
 	e := new(Executor)
-	e.On("FindExecutable", "aws").Return("aws")
-	e.On("FindExecutable", "kubectl").Return("kubectl")
+	e.On("FindExecutable", "aws").Return("aws", nil)
+	e.On("FindExecutable", "kubectl").Return("kubectl", nil)
 	return e
 }
 

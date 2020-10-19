@@ -41,19 +41,25 @@ func newRootCmd(version string) *rootCmd {
 			k := kubectl.Create(nil)
 			aws := aws.Create(nil)
 
-			kubectl := k.FindCli()
-			if kubectl == "" {
-				log.Fatal("Unable to find kubectl")
+			_, err := k.FindCli()
+			if err != nil {
+				log.Fatalf("Unable to find kubectl -> %s", err.Error())
 			}
 
-			a := aws.FindCli()
-			if a == "" {
-				log.Fatal("Unable to find aws cli")
+			_, err = aws.FindCli()
+			if err != nil {
+				log.Fatalf("Unable to find aws cli -> %s", err.Error())
 			}
 
-			awsProfile := aws.SelectProfile()
+			awsProfile, err := aws.SelectProfile()
+			if err != nil {
+				log.Fatal(err)
+			}
 			fmt.Println("")
-			kubeContext := k.SelectContext()
+			kubeContext, err := k.SelectContext()
+			if err != nil {
+				log.Fatal(err)
+			}
 			fmt.Println("")
 			fmt.Println(aurora.Green(console.BuildAlias(args[0], awsProfile, kubeContext)))
 		},
