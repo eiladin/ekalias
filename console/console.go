@@ -3,7 +3,6 @@ package console
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -13,17 +12,17 @@ import (
 )
 
 type Executor interface {
-	ReadInput() string
-	ExecCommand(string, ...string) string
+	ReadInput() (string, error)
+	ExecCommand(string, ...string) (string, error)
 	ExecInteractive(string, ...string) error
-	FindExecutable(string) string
+	FindExecutable(string) (string, error)
 }
 
 type DefaultExecutor struct{}
 
 var _ Executor = DefaultExecutor{}
 
-func SelectValueFromList(e Executor, list []string, description string, newFunc func() (string, error)) string {
+func SelectValueFromList(e Executor, list []string, description string, newFunc func() (string, error)) (string, error) {
 	var result string
 	for result == "" {
 		max := 0
@@ -39,7 +38,10 @@ func SelectValueFromList(e Executor, list []string, description string, newFunc 
 		}
 
 		fmt.Printf("\nSelect %s [%d-%d]: ", description, 1, max)
-		r := e.ReadInput()
+		r, err := e.ReadInput()
+		if err != nil {
+			return "", err
+		}
 		i, err := strconv.Atoi(r)
 		errInvalidInput := aurora.Red(fmt.Sprintf("invalid input -- valid selections: 1-%d\n", max))
 		if err != nil {
@@ -63,28 +65,28 @@ func SelectValueFromList(e Executor, list []string, description string, newFunc 
 			}
 		}
 	}
-	return result
+	return result, nil
 }
 
 func BuildAlias(aliasname, awsProfile, kubeContext string) string {
 	return fmt.Sprintf(`alias %s="export AWS_PROFILE=%s && kubectl config use-context %s"`, aliasname, awsProfile, kubeContext)
 }
 
-func (e DefaultExecutor) ReadInput() string {
+func (e DefaultExecutor) ReadInput() (string, error) {
 	reader := bufio.NewReader(os.Stdin)
 	r, err := reader.ReadString('\n')
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
-	return strings.Replace(r, "\n", "", -1)
+	return strings.Replace(r, "\n", "", -1), nil
 }
 
-func (e DefaultExecutor) ExecCommand(name string, arg ...string) string {
+func (e DefaultExecutor) ExecCommand(name string, arg ...string) (string, error) {
 	out, err := exec.Command(name, arg...).Output()
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
-	return string(out)
+	return string(out), nil
 }
 
 func (e DefaultExecutor) ExecInteractive(name string, arg ...string) error {
@@ -99,10 +101,10 @@ func (e DefaultExecutor) ExecInteractive(name string, arg ...string) error {
 	return cmd.Run()
 }
 
-func (e DefaultExecutor) FindExecutable(name string) string {
+func (e DefaultExecutor) FindExecutable(name string) (string, error) {
 	p, err := exec.LookPath(name)
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
-	return p
+	return p, nil
 }

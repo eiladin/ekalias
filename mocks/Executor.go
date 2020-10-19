@@ -11,7 +11,7 @@ type Executor struct {
 }
 
 // ExecCommand provides a mock function with given fields: _a0, _a1
-func (_m *Executor) ExecCommand(_a0 string, _a1 ...string) string {
+func (_m *Executor) ExecCommand(_a0 string, _a1 ...string) (string, error) {
 	_va := make([]interface{}, len(_a1))
 	for _i := range _a1 {
 		_va[_i] = _a1[_i]
@@ -28,7 +28,14 @@ func (_m *Executor) ExecCommand(_a0 string, _a1 ...string) string {
 		r0 = ret.Get(0).(string)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, ...string) error); ok {
+		r1 = rf(_a0, _a1...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // ExecInteractive provides a mock function with given fields: _a0, _a1
@@ -53,7 +60,7 @@ func (_m *Executor) ExecInteractive(_a0 string, _a1 ...string) error {
 }
 
 // FindExecutable provides a mock function with given fields: _a0
-func (_m *Executor) FindExecutable(_a0 string) string {
+func (_m *Executor) FindExecutable(_a0 string) (string, error) {
 	ret := _m.Called(_a0)
 
 	var r0 string
@@ -63,11 +70,18 @@ func (_m *Executor) FindExecutable(_a0 string) string {
 		r0 = ret.Get(0).(string)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // ReadInput provides a mock function with given fields:
-func (_m *Executor) ReadInput() string {
+func (_m *Executor) ReadInput() (string, error) {
 	ret := _m.Called()
 
 	var r0 string
@@ -77,5 +91,12 @@ func (_m *Executor) ReadInput() string {
 		r0 = ret.Get(0).(string)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }

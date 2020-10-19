@@ -21,18 +21,27 @@ func Create(e console.Executor) Kubectl {
 	return k
 }
 
-func (k Kubectl) FindCli() string {
+func (k Kubectl) FindCli() (string, error) {
 	return k.executor.FindExecutable("kubectl")
 }
 
-func (k Kubectl) findContexts() []string {
-	kubectl := k.FindCli()
-	out := k.executor.ExecCommand(kubectl, "config", "get-contexts", "-o", "name")
-	return strings.Split(out, "\n")
+func (k Kubectl) findContexts() ([]string, error) {
+	kubectl, err := k.FindCli()
+	if err != nil {
+		return []string{}, err
+	}
+	out, err := k.executor.ExecCommand(kubectl, "config", "get-contexts", "-o", "name")
+	if err != nil {
+		return []string{}, err
+	}
+	return strings.Split(out, "\n"), nil
 }
 
-func (k Kubectl) SelectContext() string {
-	contexts := k.findContexts()
+func (k Kubectl) SelectContext() (string, error) {
+	contexts, err := k.findContexts()
+	if err != nil {
+		return "", err
+	}
 	aws := aws.Create(k.executor)
 	return console.SelectValueFromList(k.executor, contexts, "Kube Context", aws.CreateKubeContext)
 }
