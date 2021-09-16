@@ -55,9 +55,17 @@ func (aws AWS) profileExists(newProfile string) bool {
 
 func (aws AWS) CreateProfile() (string, error) {
 	var newProfile string
+	sso := false
 	for newProfile == "" {
-		fmt.Print("AWS Profile Name: ")
+		fmt.Print("Use SSO? (only 'yes' will be accepted to approve): ")
 		r, err := aws.executor.ReadInput()
+		if err != nil {
+			return "", err
+		}
+		sso = r == "yes"
+
+		fmt.Print("AWS Profile Name: ")
+		r, err = aws.executor.ReadInput()
 		if err != nil {
 			return "", err
 		}
@@ -74,7 +82,11 @@ func (aws AWS) CreateProfile() (string, error) {
 		return "", err
 	}
 
-	err = aws.executor.ExecInteractive(cli, "configure", "--profile", newProfile)
+	args := []string{"configure", "--profile", newProfile}
+	if sso {
+		args = append(args, "sso")
+	}
+	err = aws.executor.ExecInteractive(cli, args...)
 	if err != nil {
 		return "", err
 	}
