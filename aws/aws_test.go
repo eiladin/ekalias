@@ -9,8 +9,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/eiladin/ekalias/console"
-
 	"github.com/eiladin/ekalias/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -25,19 +23,9 @@ func TestAWSSuite(t *testing.T) {
 }
 
 func (suite AWSSuite) TestNew() {
-	e := mocks.Executor{}
-	cases := []struct {
-		executor       console.Executor
-		expectedResult console.Executor
-	}{
-		{expectedResult: console.DefaultExecutor{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr}},
-		{executor: &e, expectedResult: &e},
-	}
-
-	for _, c := range cases {
-		aws := New(c.executor)
-		suite.Equal(c.expectedResult, aws.executor)
-	}
+	e := new(mocks.Executor)
+	aws := New(e)
+	suite.Equal(e, aws.executor)
 }
 
 func (suite AWSSuite) TestFindCli() {
@@ -60,26 +48,18 @@ func (suite AWSSuite) TestFindProfiles() {
 	}{
 		{
 			findExecutableResult: "aws",
-			findExecutableError:  nil,
 			execCommandResult:    "a\nb\nc",
-			execCommandError:     nil,
 			expectedResultLen:    3,
-			expectedError:        false,
 		},
 		{
 			findExecutableResult: "",
 			findExecutableError:  errors.New("find executable error"),
 			execCommandResult:    "a\nb\nc",
-			execCommandError:     nil,
-			expectedResultLen:    0,
 			expectedError:        true,
 		},
 		{
 			findExecutableResult: "aws",
-			findExecutableError:  nil,
-			execCommandResult:    "",
 			execCommandError:     errors.New("exec command error"),
-			expectedResultLen:    0,
 			expectedError:        true,
 		},
 	}
@@ -110,7 +90,7 @@ func (suite AWSSuite) TestProfileExists() {
 		exists  bool
 	}{
 		{profile: "b", exists: true},
-		{profile: "d", exists: false},
+		{profile: "d"},
 	}
 
 	for _, c := range cases {
@@ -294,6 +274,11 @@ func (suite AWSSuite) TestCreateKubeContext() {
 			regionError:   errors.New("region error"),
 			expectedError: true,
 		},
+		{
+			region:        "us-east-1",
+			clusterlist:   `{"clusters": []}`,
+			expectedError: true,
+		},
 	}
 
 	for _, c := range cases {
@@ -350,5 +335,4 @@ func (suite AWSSuite) TestSelectProfile() {
 		suite.Equal(c.expectedResult, os.Getenv("AWS_PROFILE"))
 		os.Unsetenv("AWS_PROFILE")
 	}
-
 }

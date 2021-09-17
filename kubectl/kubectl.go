@@ -12,13 +12,7 @@ type Kubectl struct {
 }
 
 func New(e console.Executor) Kubectl {
-	k := Kubectl{
-		executor: e,
-	}
-	if k.executor == nil {
-		k.executor = console.New(nil, nil, nil)
-	}
-	return k
+	return Kubectl{executor: e}
 }
 
 func (k Kubectl) FindCli() (string, error) {

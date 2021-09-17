@@ -5,10 +5,8 @@ package kubectl
 
 import (
 	"errors"
-	"os"
 	"testing"
 
-	"github.com/eiladin/ekalias/console"
 	"github.com/eiladin/ekalias/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -24,24 +22,8 @@ func TestKubectlSuite(t *testing.T) {
 
 func (suite KubectlSuite) TestNew() {
 	e := new(mocks.Executor)
-	cases := []struct {
-		executor       console.Executor
-		expectedResult console.Executor
-	}{
-		{
-			executor:       nil,
-			expectedResult: console.DefaultExecutor{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr},
-		},
-		{
-			executor:       e,
-			expectedResult: e,
-		},
-	}
-
-	for _, c := range cases {
-		k := New(c.executor)
-		suite.Equal(c.expectedResult, k.executor)
-	}
+	k := New(e)
+	suite.Equal(e, k.executor)
 }
 
 func (suite KubectlSuite) TestFindContexts() {
@@ -55,26 +37,19 @@ func (suite KubectlSuite) TestFindContexts() {
 	}{
 		{
 			findExecutableResult: "kubectl",
-			findExecutableError:  nil,
 			execCommandResult:    "a\nb\nc",
-			execCommandError:     nil,
 			expectedResultLen:    3,
-			expectedError:        false,
 		},
 		{
 			findExecutableResult: "",
 			findExecutableError:  errors.New("find executable error"),
 			execCommandResult:    "a\nb\nc",
-			execCommandError:     nil,
-			expectedResultLen:    0,
 			expectedError:        true,
 		},
 		{
 			findExecutableResult: "kubectl",
-			findExecutableError:  nil,
 			execCommandResult:    "",
 			execCommandError:     errors.New("exec command error"),
-			expectedResultLen:    0,
 			expectedError:        true,
 		},
 	}
@@ -119,7 +94,7 @@ func (suite KubectlSuite) TestFindCli() {
 		cmd string
 		err error
 	}{
-		{cmd: "kubectl", err: nil},
+		{cmd: "kubectl"},
 		{err: errors.New("error")},
 	}
 

@@ -45,39 +45,35 @@ func New(in io.Reader, out, err io.Writer) Executor {
 func (e DefaultExecutor) SelectValueFromList(list []string, description string, newFunc func() (string, error)) (string, error) {
 	var result string
 	for result == "" {
-		max := 0
+		count := 0
 		for _, item := range list {
 			if item != "" {
-				max++
-				fmt.Fprintf(e.Stdout, "%d. %s\n", max, item)
+				count++
+				fmt.Fprintf(e.Stdout, "%d. %s\n", count, item)
 			}
 		}
 		if newFunc != nil {
-			max++
-			fmt.Fprintf(e.Stdout, "%d. %s\n", max, "Create New")
+			count++
+			fmt.Fprintf(e.Stdout, "%d. %s\n", count, "Create New")
 		}
 
-		r, err := e.PromptInput(fmt.Sprintf("\nSelect %s [%d-%d]: ", description, 1, max))
+		r, err := e.PromptInput(fmt.Sprintf("\nSelect %s [%d-%d]: ", description, 1, count))
 		if err != nil {
 			return "", err
 		}
 
 		i, err := strconv.Atoi(r)
-		errInvalidInput := aurora.Red(fmt.Sprintf("invalid input -- valid selections: 1-%d\n", max))
+		errInvalidInput := aurora.Red(fmt.Sprintf("invalid input -- valid selections: 1-%d\n", count))
 		if err != nil {
 			fmt.Fprintln(e.Stdout, errInvalidInput)
 		} else {
-			if i > max || i < 1 {
+			if i > count || i < 1 {
 				fmt.Fprintln(e.Stdout, errInvalidInput)
 			} else {
-				if i == max && newFunc != nil {
+				if i == count && newFunc != nil {
 					var err error
-					result, err = newFunc()
-					for err != nil {
-						result, err = newFunc()
-						if err != nil {
-							fmt.Fprintln(e.Stdout, aurora.Red(err))
-						}
+					for result, err = newFunc(); err != nil; result, err = newFunc() {
+						fmt.Fprintln(e.Stdout, aurora.Red(err))
 					}
 				} else {
 					result = list[i-1]

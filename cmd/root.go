@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/eiladin/ekalias/aws"
 	"github.com/eiladin/ekalias/console"
@@ -38,8 +39,9 @@ func newRootCmd(version string) *rootCmd {
 			return validateArgs(args)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			k := kubectl.New(nil)
-			aws := aws.New(nil)
+			executor := console.New(os.Stdin, os.Stdout, os.Stderr)
+			k := kubectl.New(executor)
+			aws := aws.New(executor)
 
 			_, err := k.FindCli()
 			if err != nil {

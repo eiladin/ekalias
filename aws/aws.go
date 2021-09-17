@@ -11,17 +11,14 @@ import (
 
 var ErrProfileSpaces = errors.New("profile name cannot have spaces")
 var ErrProfileExists = errors.New("profile name already exists")
+var ErrNoClusters = errors.New("no clusters in selected account/region")
 
 type AWS struct {
 	executor console.Executor
 }
 
 func New(e console.Executor) AWS {
-	aws := AWS{executor: e}
-	if aws.executor == nil {
-		aws.executor = console.New(nil, nil, nil)
-	}
-	return aws
+	return AWS{executor: e}
 }
 
 func (aws AWS) FindCli() (string, error) {
@@ -33,10 +30,12 @@ func (aws AWS) findProfiles() ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
+
 	out, err := aws.executor.ExecCommand(cli, "configure", "list-profiles")
 	if err != nil {
 		return []string{}, err
 	}
+
 	return strings.Split(out, "\n"), nil
 }
 
@@ -45,11 +44,13 @@ func (aws AWS) profileExists(newProfile string) bool {
 	if err != nil {
 		return false
 	}
+
 	for _, prof := range profs {
 		if prof == newProfile {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -74,11 +75,12 @@ func (aws AWS) CreateProfile() (string, error) {
 			return "", err
 		}
 
-		if len(strings.Split(r, " ")) > 1 {
+		switch {
+		case len(strings.Split(r, " ")) > 1:
 			return "", ErrProfileSpaces
-		} else if aws.profileExists(r) {
+		case aws.profileExists(r):
 			return "", ErrProfileExists
-		} else {
+		default:
 			newProfile = r
 		}
 	}
@@ -107,29 +109,30 @@ func (aws AWS) CreateKubeContext() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	region, err = aws.executor.PromptInput("AWS Region: ")
+	if err != nil {
+		return "", err
+	}
+
+	out, err := aws.executor.ExecCommand(cli, "eks", "list-clusters", "--region", region)
+	if err != nil {
+		return "", err
+	}
+
+	cl := clusterlist{}
+	err = json.Unmarshal([]byte(out), &cl)
+	if err != nil {
+		return "", err
+	}
+	if len(cl.Clusters) == 0 {
+		return "", ErrNoClusters
+	}
+
 	for context == "" {
-		var err error
-		region, err = aws.executor.PromptInput("AWS Region: ")
+		context, err = aws.executor.SelectValueFromList(cl.Clusters, "Cluster", nil)
 		if err != nil {
 			return "", err
-		}
-
-		out, err := aws.executor.ExecCommand(cli, "eks", "list-clusters", "--region", region)
-		if err != nil {
-			return "", err
-		}
-
-		cl := clusterlist{}
-		err = json.Unmarshal([]byte(out), &cl)
-		if err != nil {
-			return "", err
-		}
-
-		if len(cl.Clusters) > 0 {
-			context, err = aws.executor.SelectValueFromList(cl.Clusters, "Cluster", nil)
-			if err != nil {
-				return "", err
-			}
 		}
 	}
 
@@ -146,7 +149,7 @@ func (aws AWS) CreateKubeContext() (string, error) {
 		args = append(args, "--alias", alias)
 	}
 
-	out, err := aws.executor.ExecCommand(cli, args...)
+	out, err = aws.executor.ExecCommand(cli, args...)
 	if err != nil {
 		return "", err
 	}
