@@ -22,16 +22,24 @@ type Executor interface {
 }
 
 type DefaultExecutor struct {
-	Stdin io.Reader
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
 }
 
 var _ Executor = DefaultExecutor{}
 
-func New(reader io.Reader) Executor {
-	if reader == nil {
-		return DefaultExecutor{Stdin: os.Stdin}
+func New(in io.Reader, out, err io.Writer) Executor {
+	if in == nil {
+		in = os.Stdin
 	}
-	return DefaultExecutor{Stdin: reader}
+	if out == nil {
+		out = os.Stdout
+	}
+	if err == nil {
+		err = os.Stderr
+	}
+	return DefaultExecutor{Stdin: in, Stdout: out, Stderr: err}
 }
 
 func (e DefaultExecutor) SelectValueFromList(list []string, description string, newFunc func() (string, error)) (string, error) {
@@ -41,12 +49,12 @@ func (e DefaultExecutor) SelectValueFromList(list []string, description string, 
 		for _, item := range list {
 			if item != "" {
 				max++
-				fmt.Printf("%d. %s\n", max, item)
+				fmt.Fprintf(e.Stdout, "%d. %s\n", max, item)
 			}
 		}
 		if newFunc != nil {
 			max++
-			fmt.Printf("%d. %s\n", max, "Create New")
+			fmt.Fprintf(e.Stdout, "%d. %s\n", max, "Create New")
 		}
 
 		r, err := e.PromptInput(fmt.Sprintf("\nSelect %s [%d-%d]: ", description, 1, max))
@@ -57,10 +65,10 @@ func (e DefaultExecutor) SelectValueFromList(list []string, description string, 
 		i, err := strconv.Atoi(r)
 		errInvalidInput := aurora.Red(fmt.Sprintf("invalid input -- valid selections: 1-%d\n", max))
 		if err != nil {
-			fmt.Println(errInvalidInput)
+			fmt.Fprintln(e.Stdout, errInvalidInput)
 		} else {
 			if i > max || i < 1 {
-				fmt.Println(errInvalidInput)
+				fmt.Fprintln(e.Stdout, errInvalidInput)
 			} else {
 				if i == max && newFunc != nil {
 					var err error
@@ -68,7 +76,7 @@ func (e DefaultExecutor) SelectValueFromList(list []string, description string, 
 					for err != nil {
 						result, err = newFunc()
 						if err != nil {
-							fmt.Println(aurora.Red(err))
+							fmt.Fprintln(e.Stdout, aurora.Red(err))
 						}
 					}
 				} else {
@@ -85,7 +93,7 @@ func BuildAlias(aliasname, awsProfile, kubeContext string) string {
 }
 
 func (e DefaultExecutor) PromptInput(prompt string) (string, error) {
-	fmt.Print(prompt)
+	fmt.Fprint(e.Stdout, prompt)
 	return e.ReadInput()
 }
 
@@ -99,11 +107,15 @@ func (e DefaultExecutor) ReadInput() (string, error) {
 }
 
 func (e DefaultExecutor) ExecCommand(name string, arg ...string) (string, error) {
-	out, err := exec.Command(name, arg...).Output()
-	if err != nil {
-		return "", err
+	cmd := &exec.Cmd{
+		Path:   name,
+		Args:   append([]string{name}, arg...),
+		Stdin:  e.Stdin,
+		Stderr: e.Stderr,
 	}
-	return string(out), nil
+
+	out, err := cmd.Output()
+	return string(out), err
 }
 
 func (e DefaultExecutor) ExecInteractive(name string, arg ...string) error {
@@ -111,8 +123,8 @@ func (e DefaultExecutor) ExecInteractive(name string, arg ...string) error {
 		Path:   name,
 		Args:   append([]string{name}, arg...),
 		Stdin:  e.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+		Stdout: e.Stdout,
+		Stderr: e.Stderr,
 	}
 
 	return cmd.Run()

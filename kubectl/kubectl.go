@@ -16,7 +16,7 @@ func New(e console.Executor) Kubectl {
 		executor: e,
 	}
 	if k.executor == nil {
-		k.executor = console.New(nil)
+		k.executor = console.New(nil, nil, nil)
 	}
 	return k
 }

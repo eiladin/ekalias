@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/eiladin/ekalias/mocks"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -31,7 +30,7 @@ func (suite ConsoleSuite) TestNew() {
 	}
 
 	for _, c := range cases {
-		e := New(c.reader).(DefaultExecutor)
+		e := New(c.reader, nil, nil).(DefaultExecutor)
 		suite.Equal(c.expected, e.Stdin)
 	}
 }
@@ -48,15 +47,24 @@ func (suite ConsoleSuite) TestReadInput() {
 		list: []string{content},
 	}
 
-	e := New(&stdin)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	e := New(&stdin, &stdout, &stderr)
+
 	res, err := e.ReadInput()
 	suite.Equal("test input", res)
 	suite.NoError(err)
 }
 
 func (suite ConsoleSuite) TestExecCommand() {
-	e := New(nil)
-	res, err := e.ExecCommand("echo", "hello", "world")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	e := New(nil, &stdout, &stderr)
+
+	path, err := exec.LookPath("echo")
+	suite.NoError(err)
+
+	res, err := e.ExecCommand(path, "hello", "world")
 	suite.NoError(err)
 	suite.Equal("hello world\n", res)
 
@@ -66,20 +74,23 @@ func (suite ConsoleSuite) TestExecCommand() {
 }
 
 func (suite ConsoleSuite) TestExecInteractive() {
-	e := New(nil)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	e := New(nil, &stdout, &stderr)
+
 	path, err := exec.LookPath("echo")
 	suite.NoError(err)
 
-	res := mocks.ReadStdOut(func() {
-		err := e.ExecInteractive(path, "hello", "world")
-		suite.NoError(err)
-	})
-
-	suite.Equal("hello world\n", res)
+	err = e.ExecInteractive(path, "hello", "world")
+	suite.NoError(err)
+	suite.Equal("hello world\n", stdout.String())
 }
 
 func (suite ConsoleSuite) TestFindExecutable() {
-	e := New(nil)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	e := New(nil, &stdout, &stderr)
+
 	res, err := e.FindExecutable("echo")
 	suite.NoError(err)
 	suite.Contains(res, "echo")
@@ -111,16 +122,16 @@ func (suite ConsoleSuite) TestSelectValueFromList() {
 			list: []string{c.selection},
 		}
 
-		mocks.ReadStdOut(func() {
-			de := New(&stdin)
-			res, err := de.SelectValueFromList(c.list, "test item", func() (string, error) { return "new item", nil })
-			if c.errorExpected {
-				suite.Error(err)
-			} else {
-				suite.NoError(err)
-				suite.Equal(res, c.expected)
-			}
-		})
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		de := New(&stdin, &stdout, &stderr)
+		res, err := de.SelectValueFromList(c.list, "test item", func() (string, error) { return "new item", nil })
+		if c.errorExpected {
+			suite.Error(err)
+		} else {
+			suite.NoError(err)
+			suite.Equal(res, c.expected)
+		}
 	}
 }
 
@@ -168,15 +179,16 @@ func (suite ConsoleSuite) TestSelectValueFromListInvalidSelection() {
 		stdin := mockReader{
 			list: []string{c.initialSelection, c.finalSelection},
 		}
-		e := New(&stdin)
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		e := New(&stdin, &stdout, &stderr)
 
-		out := mocks.ReadStdOut(func() {
-			res, err := e.SelectValueFromList(c.list, "test item", c.newItemFunc)
-			suite.NoError(err, "case number: %d", i)
-			suite.Equal(c.expected, res, "case number: %d", i)
-		})
+		res, err := e.SelectValueFromList(c.list, "test item", c.newItemFunc)
+		suite.NoError(err, "case number: %d", i)
+		suite.Equal(c.expected, res, "case number: %d", i)
+
 		if c.errorExpected != "" {
-			suite.Contains(out, c.errorExpected, "case number: %d", i)
+			suite.Contains(stdout.String(), c.errorExpected)
 		}
 	}
 }

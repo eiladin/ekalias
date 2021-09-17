@@ -19,7 +19,7 @@ type AWS struct {
 func New(e console.Executor) AWS {
 	aws := AWS{executor: e}
 	if aws.executor == nil {
-		aws.executor = console.New(nil)
+		aws.executor = console.New(nil, nil, nil)
 	}
 	return aws
 }

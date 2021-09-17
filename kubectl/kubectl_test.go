@@ -23,18 +23,18 @@ func TestKubectlSuite(t *testing.T) {
 }
 
 func (suite KubectlSuite) TestNew() {
-	me := mocks.NewExecutor()
+	e := new(mocks.Executor)
 	cases := []struct {
 		executor       console.Executor
 		expectedResult console.Executor
 	}{
 		{
 			executor:       nil,
-			expectedResult: console.DefaultExecutor{Stdin: os.Stdin},
+			expectedResult: console.DefaultExecutor{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr},
 		},
 		{
-			executor:       me,
-			expectedResult: me,
+			executor:       e,
+			expectedResult: e,
 		},
 	}
 
@@ -84,49 +84,56 @@ func (suite KubectlSuite) TestFindContexts() {
 		e.On("FindExecutable", "kubectl").Return(c.findExecutableResult, c.findExecutableError)
 		e.On("ExecCommand", "kubectl", "config", "get-contexts", "-o", "name").Return(c.execCommandResult, c.execCommandError)
 		k := New(e)
-		mocks.ReadStdOut(func() {
-			res, err := k.findContexts()
-			if c.expectedError {
-				suite.Error(err)
-			} else {
-				suite.NoError(err)
-			}
-			suite.Len(res, c.expectedResultLen)
-		})
+
+		res, err := k.findContexts()
+		if c.expectedError {
+			suite.Error(err)
+		} else {
+			suite.NoError(err)
+		}
+		suite.Len(res, c.expectedResultLen)
 	}
 }
 
 func (suite KubectlSuite) TestSelectContext() {
-	e := mocks.NewExecutor()
+	e := new(mocks.Executor)
+	e.On("FindExecutable", "kubectl").Return("kubectl", nil)
 	e.On("ExecCommand", "kubectl", "config", "get-contexts", "-o", "name").Return("a\nb\nc", nil)
 	e.On("ReadInput").Return("2", nil)
 	e.On("SelectValueFromList", []string{"a", "b", "c"}, "Kube Context", mock.Anything).Return("b", nil)
 	k := New(e)
-
-	mocks.ReadStdOut(func() {
-		res, err := k.SelectContext()
-		suite.NoError(err)
-		suite.Equal("b", res)
-	})
+	res, err := k.SelectContext()
+	suite.NoError(err)
+	suite.Equal("b", res)
 
 	e = new(mocks.Executor)
 	e.On("FindExecutable", "kubectl").Return("", errors.New("error"))
 	k = New(e)
-	res, err := k.SelectContext()
+	res, err = k.SelectContext()
 	suite.Error(err)
 	suite.Empty(res)
 }
 
 func (suite KubectlSuite) TestFindCli() {
-	k := New(mocks.NewExecutor())
-	res, err := k.FindCli()
-	suite.NoError(err)
-	suite.Equal("kubectl", res)
+	cases := []struct {
+		cmd string
+		err error
+	}{
+		{cmd: "kubectl", err: nil},
+		{err: errors.New("error")},
+	}
 
-	e := new(mocks.Executor)
-	e.On("FindExecutable", "kubectl").Return("", errors.New("error"))
-	k = New(e)
-	res, err = k.FindCli()
-	suite.Error(err)
-	suite.Empty(res)
+	for _, c := range cases {
+		e := new(mocks.Executor)
+		e.On("FindExecutable", "kubectl").Return(c.cmd, c.err)
+		k := New(e)
+		res, err := k.FindCli()
+		if c.err == nil {
+			suite.NoError(err)
+			suite.Equal(c.cmd, res)
+		} else {
+			suite.Error(err)
+			suite.Empty(res)
+		}
+	}
 }

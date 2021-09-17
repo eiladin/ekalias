@@ -25,19 +25,13 @@ func TestAWSSuite(t *testing.T) {
 }
 
 func (suite AWSSuite) TestNew() {
-	e := mocks.NewExecutor()
+	e := mocks.Executor{}
 	cases := []struct {
 		executor       console.Executor
 		expectedResult console.Executor
 	}{
-		{
-			executor:       nil,
-			expectedResult: console.DefaultExecutor{Stdin: os.Stdin},
-		},
-		{
-			executor:       e,
-			expectedResult: e,
-		},
+		{expectedResult: console.DefaultExecutor{Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr}},
+		{executor: &e, expectedResult: &e},
 	}
 
 	for _, c := range cases {
@@ -47,7 +41,9 @@ func (suite AWSSuite) TestNew() {
 }
 
 func (suite AWSSuite) TestFindCli() {
-	a := New(mocks.NewExecutor())
+	e := new(mocks.Executor)
+	a := New(e)
+	e.On("FindExecutable", "aws").Return("aws", nil)
 	res, err := a.FindCli()
 	suite.NoError(err)
 	suite.Equal("aws", res)
@@ -93,21 +89,20 @@ func (suite AWSSuite) TestFindProfiles() {
 		e.On("FindExecutable", "aws").Return(c.findExecutableResult, c.findExecutableError)
 		e.On("ExecCommand", "aws", "configure", "list-profiles").Return(c.execCommandResult, c.execCommandError)
 		a := New(e)
-		mocks.ReadStdOut(func() {
-			res, err := a.findProfiles()
-			if c.expectedError {
-				suite.Error(err)
-			} else {
-				suite.NoError(err)
-			}
-			suite.Len(res, c.expectedResultLen)
-		})
+		res, err := a.findProfiles()
+		if c.expectedError {
+			suite.Error(err)
+		} else {
+			suite.NoError(err)
+		}
+		suite.Len(res, c.expectedResultLen)
 	}
 }
 
 func (suite AWSSuite) TestProfileExists() {
-	e := mocks.NewExecutor()
+	e := new(mocks.Executor)
 	e.On("ExecCommand", "aws", "configure", "list-profiles").Return("a\nb\nc", nil)
+	e.On("FindExecutable", "aws").Return("aws", nil)
 	a := New(e)
 
 	cases := []struct {
@@ -204,14 +199,12 @@ func (suite AWSSuite) TestCreateProfile() {
 		e.On("PromptInput", "AWS Profile Name: ").Return(c.newProfile, c.readInputErr)
 		a := New(&e)
 
-		mocks.ReadStdOut(func() {
-			res, err := a.CreateProfile()
-			if c.shouldErr {
-				suite.Error(err)
-			} else {
-				suite.Equal(c.newProfile, res)
-			}
-		})
+		res, err := a.CreateProfile()
+		if c.shouldErr {
+			suite.Error(err)
+		} else {
+			suite.Equal(c.newProfile, res)
+		}
 	}
 }
 
@@ -314,15 +307,14 @@ func (suite AWSSuite) TestCreateKubeContext() {
 		e.On("ExecCommand", "aws", "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName, "--alias", c.alias).Return(fmt.Sprintf("Updated context %s in /home/user/.kube/config", c.alias), c.updateConfigError)
 		e.On("SelectValueFromList", c.selectList, "Cluster", mock.Anything).Return(c.selectedClusterName, c.selectClusterError)
 		a := New(e)
-		mocks.ReadStdOut(func() {
-			res, err := a.CreateKubeContext()
-			suite.Equal(c.expectedResult, res)
-			if c.expectedError != false {
-				suite.Error(err)
-			} else {
-				suite.NoError(err)
-			}
-		})
+
+		res, err := a.CreateKubeContext()
+		suite.Equal(c.expectedResult, res)
+		if c.expectedError != false {
+			suite.Error(err)
+		} else {
+			suite.NoError(err)
+		}
 	}
 }
 
@@ -334,21 +326,10 @@ func (suite AWSSuite) TestSelectProfile() {
 		shouldError        bool
 		expectedResult     string
 	}{
-		{
-			expectedResult: "a",
-		},
-		{
-			findProfilesError: errors.New("find profiles"),
-			shouldError:       true,
-		},
-		{
-			listProfilesError: errors.New("list profiles"),
-			shouldError:       true,
-		},
-		{
-			selectProfileError: errors.New("select profile"),
-			shouldError:        true,
-		},
+		{expectedResult: "a"},
+		{findProfilesError: errors.New("find profiles"), shouldError: true},
+		{listProfilesError: errors.New("list profiles"), shouldError: true},
+		{selectProfileError: errors.New("select profile"), shouldError: true},
 	}
 
 	for _, c := range cases {
@@ -358,17 +339,16 @@ func (suite AWSSuite) TestSelectProfile() {
 		e.On("ReadInput").Return("1", c.selectProfileError)
 		e.On("SelectValueFromList", []string{"a", "b", "c"}, "AWS Profile", mock.Anything).Return("a", c.selectProfileError)
 		a := New(e)
-		mocks.ReadStdOut(func() {
-			res, err := a.SelectProfile()
-			if c.shouldError {
-				suite.Error(err)
-			} else {
-				suite.NoError(err)
-			}
-			suite.Equal(c.expectedResult, res)
-			suite.Equal(c.expectedResult, os.Getenv("AWS_PROFILE"))
-			os.Unsetenv("AWS_PROFILE")
-		})
+
+		res, err := a.SelectProfile()
+		if c.shouldError {
+			suite.Error(err)
+		} else {
+			suite.NoError(err)
+		}
+		suite.Equal(c.expectedResult, res)
+		suite.Equal(c.expectedResult, os.Getenv("AWS_PROFILE"))
+		os.Unsetenv("AWS_PROFILE")
 	}
 
 }
