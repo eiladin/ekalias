@@ -2,6 +2,7 @@
 
 # [Choice] Go version: 1, 1.16, 1.17
 ARG VARIANT="1"
+ARG FZF_VERSION
 FROM mcr.microsoft.com/vscode/devcontainers/go:0-${VARIANT} as base
 
 # [Choice] Node.js version: none, lts/*, 16, 14, 12, 10
@@ -21,13 +22,19 @@ RUN curl -sSLJ "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "aw
     && unzip awscliv2.zip \
     && ./aws/install
 
+FROM tools AS fzf
+ARG FZF_VERSION
+RUN curl -sSLJ "https://github.com/junegunn/fzf/releases/download/${FZF_VERSION}/fzf-${FZF_VERSION}-linux_amd64.tar.gz" -o "fzf.tar.gz"\
+    && tar zxf fzf.tar.gz \
+    && chmod +x ./fzf
+
 FROM tools as krew
 RUN groupadd vscode
 RUN useradd -s /bin/bash --gid vscode -m vscode
 USER vscode
 WORKDIR /home/vscode
 RUN curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.tar.gz" \
-    && tar zxfv krew.tar.gz \
+    && tar zxf krew.tar.gz \
     && ./krew-linux_amd64 install krew
 
 FROM base AS final
@@ -35,6 +42,7 @@ COPY --from=awscli "/usr/local/aws-cli/" "/usr/local/aws-cli/"
 RUN ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws
 RUN ln -s /usr/local/aws-cli/v2/current/bin/aws_completer /usr/local/bin/aws_completer
 COPY --from=kubectl "kubectl" "/usr/local/bin/kubectl"
+COPY --from=fzf "fzf" "/usr/local/bin/fzf"
 USER vscode
 COPY --from=krew "/home/vscode/.krew/" "/home/vscode/.krew"
 RUN sed -i 's/plugins=(git)/plugins=(git kubectl)/g' ~/.zshrc

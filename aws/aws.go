@@ -105,6 +105,7 @@ type clusterlist struct {
 func (aws AWS) CreateKubeContext() (string, error) {
 	var context string
 	var region string
+
 	cli, err := aws.FindCli()
 	if err != nil {
 		return "", err

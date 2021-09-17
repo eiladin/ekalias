@@ -44,7 +44,7 @@ func New(in io.Reader, out, err io.Writer) Executor {
 
 func (e DefaultExecutor) SelectValueFromList(list []string, description string, newFunc func() (string, error)) (string, error) {
 	var result string
-	for result == "" {
+	for len(result) == 0 {
 		count := 0
 		for _, item := range list {
 			if item != "" {
@@ -62,23 +62,18 @@ func (e DefaultExecutor) SelectValueFromList(list []string, description string, 
 			return "", err
 		}
 
-		i, err := strconv.Atoi(r)
 		errInvalidInput := aurora.Red(fmt.Sprintf("invalid input -- valid selections: 1-%d\n", count))
-		if err != nil {
+
+		i, err := strconv.Atoi(r)
+		switch {
+		case err != nil || i > count || i < 1:
 			fmt.Fprintln(e.Stdout, errInvalidInput)
-		} else {
-			if i > count || i < 1 {
-				fmt.Fprintln(e.Stdout, errInvalidInput)
-			} else {
-				if i == count && newFunc != nil {
-					var err error
-					for result, err = newFunc(); err != nil; result, err = newFunc() {
-						fmt.Fprintln(e.Stdout, aurora.Red(err))
-					}
-				} else {
-					result = list[i-1]
-				}
+		case i == count && newFunc != nil:
+			for result, err = newFunc(); err != nil; result, err = newFunc() {
+				fmt.Fprintln(e.Stdout, aurora.Red(err))
 			}
+		default:
+			result = list[i-1]
 		}
 	}
 	return result, nil
