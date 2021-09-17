@@ -3,23 +3,23 @@ package aws
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 
 	"github.com/eiladin/ekalias/console"
 )
 
+var ErrProfileSpaces = errors.New("profile name cannot have spaces")
+var ErrProfileExists = errors.New("profile name already exists")
+
 type AWS struct {
 	executor console.Executor
 }
 
-func Create(e console.Executor) AWS {
-	aws := AWS{
-		executor: e,
-	}
+func New(e console.Executor) AWS {
+	aws := AWS{executor: e}
 	if aws.executor == nil {
-		aws.executor = console.DefaultExecutor{}
+		aws.executor = console.New(nil)
 	}
 	return aws
 }
@@ -54,42 +54,45 @@ func (aws AWS) profileExists(newProfile string) bool {
 }
 
 func (aws AWS) CreateProfile() (string, error) {
-	var newProfile string
 	sso := false
+
+	cli, err := aws.FindCli()
+	if err != nil {
+		return "", err
+	}
+
+	var newProfile string
 	for newProfile == "" {
-		fmt.Print("Use SSO? (only 'yes' will be accepted to approve): ")
-		r, err := aws.executor.ReadInput()
+		r, err := aws.executor.PromptInput("Use SSO? (only 'yes' will be accepted to approve): ")
 		if err != nil {
 			return "", err
 		}
 		sso = r == "yes"
 
-		fmt.Print("AWS Profile Name: ")
-		r, err = aws.executor.ReadInput()
+		r, err = aws.executor.PromptInput("AWS Profile Name: ")
 		if err != nil {
 			return "", err
 		}
+
 		if len(strings.Split(r, " ")) > 1 {
-			return "", errors.New("invalid input, profile name cannot have spaces")
+			return "", ErrProfileSpaces
 		} else if aws.profileExists(r) {
-			return "", errors.New("invalid input, profile name already exists")
+			return "", ErrProfileExists
 		} else {
 			newProfile = r
 		}
-	}
-	cli, err := aws.FindCli()
-	if err != nil {
-		return "", err
 	}
 
 	args := []string{"configure", "--profile", newProfile}
 	if sso {
 		args = append(args, "sso")
 	}
+
 	err = aws.executor.ExecInteractive(cli, args...)
 	if err != nil {
 		return "", err
 	}
+
 	return newProfile, nil
 }
 
@@ -105,34 +108,36 @@ func (aws AWS) CreateKubeContext() (string, error) {
 		return "", err
 	}
 	for context == "" {
-		fmt.Print("AWS Region: ")
 		var err error
-		region, err = aws.executor.ReadInput()
+		region, err = aws.executor.PromptInput("AWS Region: ")
 		if err != nil {
 			return "", err
 		}
+
 		out, err := aws.executor.ExecCommand(cli, "eks", "list-clusters", "--region", region)
 		if err != nil {
 			return "", err
 		}
+
 		cl := clusterlist{}
 		err = json.Unmarshal([]byte(out), &cl)
 		if err != nil {
 			return "", err
 		}
+
 		if len(cl.Clusters) > 0 {
-			context, err = console.SelectValueFromList(aws.executor, cl.Clusters, "Cluster", nil)
+			context, err = aws.executor.SelectValueFromList(cl.Clusters, "Cluster", nil)
 			if err != nil {
 				return "", err
 			}
 		}
 	}
 
-	fmt.Print("Kube Context Alias: ")
-	alias, err := aws.executor.ReadInput()
+	alias, err := aws.executor.PromptInput("Kube Context Alias: ")
 	if err != nil {
 		return "", err
 	}
+
 	args := []string{"eks", "update-kubeconfig", "--region", region, "--name", context}
 	var contextName string
 
@@ -140,19 +145,21 @@ func (aws AWS) CreateKubeContext() (string, error) {
 		contextName = alias
 		args = append(args, "--alias", alias)
 	}
+
 	out, err := aws.executor.ExecCommand(cli, args...)
 	if err != nil {
 		return "", err
 	}
-	s := strings.Split(out, " ")
 
 	if contextName == "" {
+		s := strings.Split(out, " ")
 		for _, item := range s {
 			if strings.HasPrefix(item, "arn:aws") {
 				contextName = item
 			}
 		}
 	}
+
 	return contextName, nil
 }
 
@@ -161,10 +168,12 @@ func (aws AWS) SelectProfile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	selectedProfile, err := console.SelectValueFromList(aws.executor, awsprofiles, "AWS Profile", aws.CreateProfile)
+
+	selectedProfile, err := aws.executor.SelectValueFromList(awsprofiles, "AWS Profile", aws.CreateProfile)
 	if err != nil {
 		return "", err
 	}
+
 	os.Setenv("AWS_PROFILE", selectedProfile)
 	return selectedProfile, nil
 }

@@ -1,13 +1,16 @@
+//go:build test
 // +build test
 
 package kubectl
 
 import (
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/eiladin/ekalias/console"
 	"github.com/eiladin/ekalias/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -19,7 +22,7 @@ func TestKubectlSuite(t *testing.T) {
 	suite.Run(t, new(KubectlSuite))
 }
 
-func (suite KubectlSuite) TestCreate() {
+func (suite KubectlSuite) TestNew() {
 	me := mocks.NewExecutor()
 	cases := []struct {
 		executor       console.Executor
@@ -27,7 +30,7 @@ func (suite KubectlSuite) TestCreate() {
 	}{
 		{
 			executor:       nil,
-			expectedResult: console.DefaultExecutor{},
+			expectedResult: console.DefaultExecutor{Stdin: os.Stdin},
 		},
 		{
 			executor:       me,
@@ -36,7 +39,7 @@ func (suite KubectlSuite) TestCreate() {
 	}
 
 	for _, c := range cases {
-		k := Create(c.executor)
+		k := New(c.executor)
 		suite.Equal(c.expectedResult, k.executor)
 	}
 }
@@ -80,7 +83,7 @@ func (suite KubectlSuite) TestFindContexts() {
 		e := new(mocks.Executor)
 		e.On("FindExecutable", "kubectl").Return(c.findExecutableResult, c.findExecutableError)
 		e.On("ExecCommand", "kubectl", "config", "get-contexts", "-o", "name").Return(c.execCommandResult, c.execCommandError)
-		k := Create(e)
+		k := New(e)
 		mocks.ReadStdOut(func() {
 			res, err := k.findContexts()
 			if c.expectedError {
@@ -97,7 +100,8 @@ func (suite KubectlSuite) TestSelectContext() {
 	e := mocks.NewExecutor()
 	e.On("ExecCommand", "kubectl", "config", "get-contexts", "-o", "name").Return("a\nb\nc", nil)
 	e.On("ReadInput").Return("2", nil)
-	k := Create(e)
+	e.On("SelectValueFromList", []string{"a", "b", "c"}, "Kube Context", mock.Anything).Return("b", nil)
+	k := New(e)
 
 	mocks.ReadStdOut(func() {
 		res, err := k.SelectContext()
@@ -107,21 +111,21 @@ func (suite KubectlSuite) TestSelectContext() {
 
 	e = new(mocks.Executor)
 	e.On("FindExecutable", "kubectl").Return("", errors.New("error"))
-	k = Create(e)
+	k = New(e)
 	res, err := k.SelectContext()
 	suite.Error(err)
 	suite.Empty(res)
 }
 
 func (suite KubectlSuite) TestFindCli() {
-	k := Create(mocks.NewExecutor())
+	k := New(mocks.NewExecutor())
 	res, err := k.FindCli()
 	suite.NoError(err)
 	suite.Equal("kubectl", res)
 
 	e := new(mocks.Executor)
 	e.On("FindExecutable", "kubectl").Return("", errors.New("error"))
-	k = Create(e)
+	k = New(e)
 	res, err = k.FindCli()
 	suite.Error(err)
 	suite.Empty(res)

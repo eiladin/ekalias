@@ -1,3 +1,4 @@
+//go:build test
 // +build test
 
 package aws
@@ -23,7 +24,7 @@ func TestAWSSuite(t *testing.T) {
 	suite.Run(t, new(AWSSuite))
 }
 
-func (suite AWSSuite) TestCreate() {
+func (suite AWSSuite) TestNew() {
 	e := mocks.NewExecutor()
 	cases := []struct {
 		executor       console.Executor
@@ -31,7 +32,7 @@ func (suite AWSSuite) TestCreate() {
 	}{
 		{
 			executor:       nil,
-			expectedResult: console.DefaultExecutor{},
+			expectedResult: console.DefaultExecutor{Stdin: os.Stdin},
 		},
 		{
 			executor:       e,
@@ -40,13 +41,13 @@ func (suite AWSSuite) TestCreate() {
 	}
 
 	for _, c := range cases {
-		aws := Create(c.executor)
+		aws := New(c.executor)
 		suite.Equal(c.expectedResult, aws.executor)
 	}
 }
 
 func (suite AWSSuite) TestFindCli() {
-	a := Create(mocks.NewExecutor())
+	a := New(mocks.NewExecutor())
 	res, err := a.FindCli()
 	suite.NoError(err)
 	suite.Equal("aws", res)
@@ -91,7 +92,7 @@ func (suite AWSSuite) TestFindProfiles() {
 		e := new(mocks.Executor)
 		e.On("FindExecutable", "aws").Return(c.findExecutableResult, c.findExecutableError)
 		e.On("ExecCommand", "aws", "configure", "list-profiles").Return(c.execCommandResult, c.execCommandError)
-		a := Create(e)
+		a := New(e)
 		mocks.ReadStdOut(func() {
 			res, err := a.findProfiles()
 			if c.expectedError {
@@ -107,7 +108,7 @@ func (suite AWSSuite) TestFindProfiles() {
 func (suite AWSSuite) TestProfileExists() {
 	e := mocks.NewExecutor()
 	e.On("ExecCommand", "aws", "configure", "list-profiles").Return("a\nb\nc", nil)
-	a := Create(e)
+	a := New(e)
 
 	cases := []struct {
 		profile string
@@ -124,7 +125,7 @@ func (suite AWSSuite) TestProfileExists() {
 
 	e = new(mocks.Executor)
 	e.On("FindExecutable", "aws").Return("", errors.New("error"))
-	a = Create(e)
+	a = New(e)
 	ex := a.profileExists("a")
 	suite.False(ex)
 }
@@ -133,36 +134,45 @@ func (suite AWSSuite) TestCreateProfile() {
 	cases := []struct {
 		existingProfiles     string
 		newProfile           string
+		sso                  bool
+		ssoError             error
 		findExecutableError  error
 		execCommandError     error
 		execInteractiveError error
-		interactiveErr       error
 		readInputErr         error
 		shouldErr            bool
 	}{
 		{
 			existingProfiles: "1\n2\n3",
 			newProfile:       "a",
-			interactiveErr:   nil,
-			shouldErr:        false,
+		},
+		{
+			existingProfiles: "1\n2\n3",
+			newProfile:       "a",
+			sso:              true,
+		},
+		{
+			existingProfiles: "1\n2\n3",
+			newProfile:       "a",
+			sso:              true,
+			ssoError:         errors.New("test"),
+			shouldErr:        true,
 		},
 		{
 			existingProfiles: "a\n\b\nc",
 			newProfile:       "a",
-			interactiveErr:   nil,
 			shouldErr:        true,
 		},
 		{
 			existingProfiles: "a\n\b\nc",
 			newProfile:       "a b",
-			interactiveErr:   nil,
 			shouldErr:        true,
 		},
 		{
-			existingProfiles: "a\n\b\nc",
-			newProfile:       "ab",
-			interactiveErr:   errors.New("test"),
-			shouldErr:        true,
+			existingProfiles:     "a\n\b\nc",
+			newProfile:           "ab",
+			execInteractiveError: errors.New("test"),
+			shouldErr:            true,
 		},
 		{
 			readInputErr: errors.New("test"),
@@ -173,15 +183,26 @@ func (suite AWSSuite) TestCreateProfile() {
 			findExecutableError: errors.New("test"),
 			shouldErr:           true,
 		},
+		{
+			newProfile:           "ab",
+			execInteractiveError: errors.New("test"),
+			shouldErr:            true,
+		},
 	}
 
 	for _, c := range cases {
-		e := new(mocks.Executor)
+		e := mocks.Executor{}
 		e.On("FindExecutable", "aws").Return("aws", c.findExecutableError)
 		e.On("ExecCommand", "aws", "configure", "list-profiles").Return(c.existingProfiles, c.execCommandError)
-		e.On("ExecInteractive", "aws", "configure", "--profile", c.newProfile).Return(c.interactiveErr, c.execInteractiveError)
-		e.On("ReadInput").Return(c.newProfile, c.readInputErr)
-		a := Create(e)
+		e.On("ExecInteractive", "aws", "configure", "--profile", c.newProfile).Return(c.execInteractiveError)
+		e.On("ExecInteractive", "aws", "configure", "--profile", c.newProfile, "sso").Return(c.execInteractiveError)
+		if c.sso {
+			e.On("PromptInput", "Use SSO? (only 'yes' will be accepted to approve): ").Return("yes", c.ssoError)
+		} else {
+			e.On("PromptInput", "Use SSO? (only 'yes' will be accepted to approve): ").Return("no", c.ssoError)
+		}
+		e.On("PromptInput", "AWS Profile Name: ").Return(c.newProfile, c.readInputErr)
+		a := New(&e)
 
 		mocks.ReadStdOut(func() {
 			res, err := a.CreateProfile()
@@ -197,8 +218,10 @@ func (suite AWSSuite) TestCreateProfile() {
 func (suite AWSSuite) TestCreateKubeContext() {
 	cases := []struct {
 		region              string
+		regionError         error
 		clusterSelection    string
 		clusterlist         string
+		selectList          []string
 		selectedClusterName string
 		alias               string
 		findExecutableError error
@@ -214,6 +237,7 @@ func (suite AWSSuite) TestCreateKubeContext() {
 			region:              "us-east-1",
 			clusterSelection:    "1",
 			clusterlist:         `{"clusters":["a","b"]}`,
+			selectList:          []string{"a", "b"},
 			selectedClusterName: "a",
 			alias:               "newalias",
 			expectedResult:      "newalias",
@@ -222,6 +246,7 @@ func (suite AWSSuite) TestCreateKubeContext() {
 			region:              "us-east-1",
 			clusterSelection:    "1",
 			clusterlist:         `{"clusters":["a","b"]}`,
+			selectList:          []string{"a", "b"},
 			selectedClusterName: "a",
 			expectedResult:      "arn:aws:eks:us-east-1:accountID:cluster/a",
 		},
@@ -229,6 +254,7 @@ func (suite AWSSuite) TestCreateKubeContext() {
 			region:              "us-east-1",
 			clusterSelection:    "1",
 			clusterlist:         `{"clusters":["a","b"}`,
+			selectList:          []string{"a", "b"},
 			selectedClusterName: "a",
 			expectedError:       true,
 		},
@@ -248,6 +274,7 @@ func (suite AWSSuite) TestCreateKubeContext() {
 			region:              "us-east-1",
 			clusterSelection:    "1",
 			clusterlist:         `{"clusters":["a","b"]}`,
+			selectList:          []string{"a", "b"},
 			selectedClusterName: "a",
 			selectClusterError:  errors.New("select cluster error"),
 			expectedError:       true,
@@ -256,6 +283,7 @@ func (suite AWSSuite) TestCreateKubeContext() {
 			region:              "us-east-1",
 			clusterSelection:    "1",
 			clusterlist:         `{"clusters":["a","b"]}`,
+			selectList:          []string{"a", "b"},
 			selectedClusterName: "a",
 			aliasError:          errors.New("select cluster error"),
 			expectedError:       true,
@@ -264,36 +292,31 @@ func (suite AWSSuite) TestCreateKubeContext() {
 			region:              "us-east-1",
 			clusterSelection:    "1",
 			clusterlist:         `{"clusters":["a","b"]}`,
+			selectList:          []string{"a", "b"},
 			selectedClusterName: "a",
 			updateConfigError:   errors.New("update config error"),
 			expectedError:       true,
-			expectedResult:      "",
+		},
+		{
+			regionError:   errors.New("region error"),
+			expectedError: true,
 		},
 	}
 
 	for _, c := range cases {
 		e := new(mocks.Executor)
-		inputs := []string{c.region, c.clusterSelection, c.alias}
-		callcounter := 0
-		readInput := e.On("ReadInput").Times(3)
-		readInput.RunFn = func(args mock.Arguments) {
-			if callcounter == 1 {
-				readInput.ReturnArguments = mock.Arguments{inputs[callcounter], c.selectClusterError}
-			} else if callcounter == 2 {
-				readInput.ReturnArguments = mock.Arguments{inputs[callcounter], c.aliasError}
-			} else {
-				readInput.ReturnArguments = mock.Arguments{inputs[callcounter], c.readInputError}
-			}
-			callcounter++
-		}
+		fullClusterName := fmt.Sprintf("arn:aws:eks:%s:accountID:cluster/%s", c.region, c.selectedClusterName)
 		e.On("FindExecutable", "aws").Return("aws", c.findExecutableError)
+		e.On("PromptInput", "AWS Region: ").Return(c.region, c.regionError)
+		e.On("PromptInput", "Kube Context Alias: ").Return(c.alias, c.aliasError)
 		e.On("ExecCommand", "aws", "eks", "list-clusters", "--region", c.region).Return(c.clusterlist, c.listClustersError)
-		e.On("ExecCommand", "aws", "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName).Return(fmt.Sprintf("Updated context arn:aws:eks:%s:accountID:cluster/%s in /home/user/.kube/config", c.region, c.selectedClusterName), c.updateConfigError)
-		e.On("ExecCommand", "aws", "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName, "--alias", c.alias).Return(fmt.Sprintf("Updated context %s in /home/user/.kube/config", c.alias), nil)
-		a := Create(e)
+		e.On("ExecCommand", "aws", "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName).Return(fmt.Sprintf("Updated context %s in /home/user/.kube/config", fullClusterName), c.updateConfigError)
+		e.On("ExecCommand", "aws", "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName, "--alias", c.alias).Return(fmt.Sprintf("Updated context %s in /home/user/.kube/config", c.alias), c.updateConfigError)
+		e.On("SelectValueFromList", c.selectList, "Cluster", mock.Anything).Return(c.selectedClusterName, c.selectClusterError)
+		a := New(e)
 		mocks.ReadStdOut(func() {
 			res, err := a.CreateKubeContext()
-			suite.Equal(res, c.expectedResult)
+			suite.Equal(c.expectedResult, res)
 			if c.expectedError != false {
 				suite.Error(err)
 			} else {
@@ -333,7 +356,8 @@ func (suite AWSSuite) TestSelectProfile() {
 		e.On("FindExecutable", "aws").Return("aws", c.findProfilesError)
 		e.On("ExecCommand", "aws", "configure", "list-profiles").Return("a\nb\nc", c.listProfilesError)
 		e.On("ReadInput").Return("1", c.selectProfileError)
-		a := Create(e)
+		e.On("SelectValueFromList", []string{"a", "b", "c"}, "AWS Profile", mock.Anything).Return("a", c.selectProfileError)
+		a := New(e)
 		mocks.ReadStdOut(func() {
 			res, err := a.SelectProfile()
 			if c.shouldError {

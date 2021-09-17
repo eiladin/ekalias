@@ -1,14 +1,14 @@
 package console
 
 import (
+	"bytes"
 	"errors"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"testing"
 
 	"github.com/eiladin/ekalias/mocks"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -20,35 +20,42 @@ func TestConsoleSuite(t *testing.T) {
 	suite.Run(t, new(ConsoleSuite))
 }
 
+func (suite ConsoleSuite) TestNew() {
+	b := bytes.Buffer{}
+	cases := []struct {
+		reader   io.Reader
+		expected io.Reader
+	}{
+		{expected: os.Stdin},
+		{reader: &b, expected: &b},
+	}
+
+	for _, c := range cases {
+		e := New(c.reader).(DefaultExecutor)
+		suite.Equal(c.expected, e.Stdin)
+	}
+}
+
 func (suite ConsoleSuite) TestBuildAlias() {
 	res := BuildAlias("aliasname", "profile", "context")
 	suite.Equal(`alias aliasname="export AWS_PROFILE=profile && kubectl config use-context context"`, res)
 }
 
 func (suite ConsoleSuite) TestReadInput() {
-	content := []byte("test input\n")
-	tmpfile, err := ioutil.TempFile("", "example")
-	suite.NoError(err)
-	defer os.Remove(tmpfile.Name())
+	content := "test input"
 
-	_, err = tmpfile.Write(content)
-	suite.NoError(err)
+	stdin := mockReader{
+		list: []string{content},
+	}
 
-	_, err = tmpfile.Seek(0, 0)
-	suite.NoError(err)
-
-	oldStdin := os.Stdin
-	defer func() { os.Stdin = oldStdin }()
-	os.Stdin = tmpfile
-
-	e := DefaultExecutor{}
+	e := New(&stdin)
 	res, err := e.ReadInput()
 	suite.Equal("test input", res)
 	suite.NoError(err)
 }
 
 func (suite ConsoleSuite) TestExecCommand() {
-	e := DefaultExecutor{}
+	e := New(nil)
 	res, err := e.ExecCommand("echo", "hello", "world")
 	suite.NoError(err)
 	suite.Equal("hello world\n", res)
@@ -59,7 +66,7 @@ func (suite ConsoleSuite) TestExecCommand() {
 }
 
 func (suite ConsoleSuite) TestExecInteractive() {
-	e := DefaultExecutor{}
+	e := New(nil)
 	path, err := exec.LookPath("echo")
 	suite.NoError(err)
 
@@ -72,7 +79,7 @@ func (suite ConsoleSuite) TestExecInteractive() {
 }
 
 func (suite ConsoleSuite) TestFindExecutable() {
-	e := DefaultExecutor{}
+	e := New(nil)
 	res, err := e.FindExecutable("echo")
 	suite.NoError(err)
 	suite.Contains(res, "echo")
@@ -83,18 +90,38 @@ func (suite ConsoleSuite) TestFindExecutable() {
 }
 
 func (suite ConsoleSuite) TestSelectValueFromList() {
-	list := []string{"a", "b", "c"}
-	selection := "1"
-	expected := "a"
+	cases := []struct {
+		list          []string
+		selection     string
+		expected      string
+		errorExpected bool
+	}{
+		{
+			list:      []string{"a", "b", "c"},
+			selection: "1",
+			expected:  "a",
+		},
+		{
+			errorExpected: true,
+		},
+	}
 
-	e := mocks.NewExecutor()
-	e.On("ReadInput").Return(selection, nil)
+	for _, c := range cases {
+		stdin := mockReader{
+			list: []string{c.selection},
+		}
 
-	mocks.ReadStdOut(func() {
-		res, err := SelectValueFromList(e, list, "test item", func() (string, error) { return "new item", nil })
-		suite.NoError(err)
-		suite.Equal(res, expected)
-	})
+		mocks.ReadStdOut(func() {
+			de := New(&stdin)
+			res, err := de.SelectValueFromList(c.list, "test item", func() (string, error) { return "new item", nil })
+			if c.errorExpected {
+				suite.Error(err)
+			} else {
+				suite.NoError(err)
+				suite.Equal(res, c.expected)
+			}
+		})
+	}
 }
 
 func (suite ConsoleSuite) TestSelectValueFromListInvalidSelection() {
@@ -138,35 +165,31 @@ func (suite ConsoleSuite) TestSelectValueFromListInvalidSelection() {
 	}
 
 	for i, c := range cases {
-		e := mocks.NewExecutor()
-		callcounter := 0
-		readInput := e.On("ReadInput").Times(2)
-		readInput.RunFn = func(args mock.Arguments) {
-			if callcounter == 0 {
-				readInput.ReturnArguments = mock.Arguments{c.initialSelection, nil}
-				callcounter = 1
-			} else {
-				readInput.ReturnArguments = mock.Arguments{c.finalSelection, nil}
-			}
+		stdin := mockReader{
+			list: []string{c.initialSelection, c.finalSelection},
 		}
+		e := New(&stdin)
 
 		out := mocks.ReadStdOut(func() {
-			res, err := SelectValueFromList(e, c.list, "test item", c.newItemFunc)
-			suite.NoError(err)
-			suite.Equal(res, c.expected)
+			res, err := e.SelectValueFromList(c.list, "test item", c.newItemFunc)
+			suite.NoError(err, "case number: %d", i)
+			suite.Equal(c.expected, res, "case number: %d", i)
 		})
 		if c.errorExpected != "" {
 			suite.Contains(out, c.errorExpected, "case number: %d", i)
 		}
 	}
+}
 
-	e := mocks.NewExecutor()
-	e.On("ReadInput").Return("", errors.New("error"))
-	mocks.ReadStdOut(func() {
-		res, err := SelectValueFromList(e, []string{"a", "b"}, "test", func() (string, error) {
-			return "", nil
-		})
-		suite.Error(err)
-		suite.Empty(res)
-	})
+type mockReader struct {
+	list []string
+}
+
+func (m *mockReader) Read(p []byte) (n int, err error) {
+	if len(m.list) == 0 {
+		return 0, io.EOF
+	}
+	n = copy(p, []byte(m.list[0]+"\n"))
+	m.list = m.list[1:]
+	return
 }

@@ -11,12 +11,12 @@ type Kubectl struct {
 	executor console.Executor
 }
 
-func Create(e console.Executor) Kubectl {
+func New(e console.Executor) Kubectl {
 	k := Kubectl{
 		executor: e,
 	}
 	if k.executor == nil {
-		k.executor = console.DefaultExecutor{}
+		k.executor = console.New(nil)
 	}
 	return k
 }
@@ -42,6 +42,6 @@ func (k Kubectl) SelectContext() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	aws := aws.Create(k.executor)
-	return console.SelectValueFromList(k.executor, contexts, "Kube Context", aws.CreateKubeContext)
+	aws := aws.New(k.executor)
+	return k.executor.SelectValueFromList(contexts, "Kube Context", aws.CreateKubeContext)
 }

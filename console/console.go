@@ -3,6 +3,7 @@ package console
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -12,17 +13,28 @@ import (
 )
 
 type Executor interface {
+	PromptInput(prompt string) (string, error)
 	ReadInput() (string, error)
 	ExecCommand(string, ...string) (string, error)
 	ExecInteractive(string, ...string) error
 	FindExecutable(string) (string, error)
+	SelectValueFromList([]string, string, func() (string, error)) (string, error)
 }
 
-type DefaultExecutor struct{}
+type DefaultExecutor struct {
+	Stdin io.Reader
+}
 
 var _ Executor = DefaultExecutor{}
 
-func SelectValueFromList(e Executor, list []string, description string, newFunc func() (string, error)) (string, error) {
+func New(reader io.Reader) Executor {
+	if reader == nil {
+		return DefaultExecutor{Stdin: os.Stdin}
+	}
+	return DefaultExecutor{Stdin: reader}
+}
+
+func (e DefaultExecutor) SelectValueFromList(list []string, description string, newFunc func() (string, error)) (string, error) {
 	var result string
 	for result == "" {
 		max := 0
@@ -37,11 +49,11 @@ func SelectValueFromList(e Executor, list []string, description string, newFunc 
 			fmt.Printf("%d. %s\n", max, "Create New")
 		}
 
-		fmt.Printf("\nSelect %s [%d-%d]: ", description, 1, max)
-		r, err := e.ReadInput()
+		r, err := e.PromptInput(fmt.Sprintf("\nSelect %s [%d-%d]: ", description, 1, max))
 		if err != nil {
 			return "", err
 		}
+
 		i, err := strconv.Atoi(r)
 		errInvalidInput := aurora.Red(fmt.Sprintf("invalid input -- valid selections: 1-%d\n", max))
 		if err != nil {
@@ -72,8 +84,13 @@ func BuildAlias(aliasname, awsProfile, kubeContext string) string {
 	return fmt.Sprintf(`alias %s="export AWS_PROFILE=%s && kubectl config use-context %s"`, aliasname, awsProfile, kubeContext)
 }
 
+func (e DefaultExecutor) PromptInput(prompt string) (string, error) {
+	fmt.Print(prompt)
+	return e.ReadInput()
+}
+
 func (e DefaultExecutor) ReadInput() (string, error) {
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(e.Stdin)
 	r, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
@@ -93,7 +110,7 @@ func (e DefaultExecutor) ExecInteractive(name string, arg ...string) error {
 	cmd := &exec.Cmd{
 		Path:   name,
 		Args:   append([]string{name}, arg...),
-		Stdin:  os.Stdin,
+		Stdin:  e.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	}

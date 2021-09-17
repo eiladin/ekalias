@@ -38,8 +38,8 @@ func newRootCmd(version string) *rootCmd {
 			return validateArgs(args)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			k := kubectl.Create(nil)
-			aws := aws.Create(nil)
+			k := kubectl.New(nil)
+			aws := aws.New(nil)
 
 			_, err := k.FindCli()
 			if err != nil {
