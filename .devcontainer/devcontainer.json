@@ -9,7 +9,8 @@
 			"VARIANT": "1",
 			// Options
 			"NODE_VERSION": "lts/*",
-			"FZF_VERSION": "0.27.2"
+			"FZF_VERSION": "0.27.2",
+			"GORELEASER_VERSION": "0.179.0"
 		}
 	},
 	"runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined" ],

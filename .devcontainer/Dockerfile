@@ -3,6 +3,7 @@
 # [Choice] Go version: 1, 1.16, 1.17
 ARG VARIANT="1"
 ARG FZF_VERSION
+ARG GORELEASER_VERSION
 FROM mcr.microsoft.com/vscode/devcontainers/go:0-${VARIANT} as base
 
 # [Choice] Node.js version: none, lts/*, 16, 14, 12, 10
@@ -37,11 +38,18 @@ RUN curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/downloa
     && tar zxf krew.tar.gz \
     && ./krew-linux_amd64 install krew
 
+FROM tools as goreleaser
+ARG GORELEASER_VERSION
+RUN curl -fsSL "https://github.com/goreleaser/goreleaser/releases/download/v${GORELEASER_VERSION}/goreleaser_Linux_x86_64.tar.gz" -o "goreleaser.tar.gz"\
+    && tar zxf goreleaser.tar.gz \
+    && chmod +x ./goreleaser
+
 FROM base AS final
 COPY --from=awscli "/usr/local/aws-cli/" "/usr/local/aws-cli/"
 RUN ln -s /usr/local/aws-cli/v2/current/bin/aws /usr/local/bin/aws
 RUN ln -s /usr/local/aws-cli/v2/current/bin/aws_completer /usr/local/bin/aws_completer
 COPY --from=kubectl "kubectl" "/usr/local/bin/kubectl"
+COPY --from=goreleaser "goreleaser" "/usr/local/bin/goreleaser"
 COPY --from=fzf "fzf" "/usr/local/bin/fzf"
 USER vscode
 COPY --from=krew "/home/vscode/.krew/" "/home/vscode/.krew"

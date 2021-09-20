@@ -12,7 +12,6 @@ builds:
     - linux
     - windows
     - darwin
-    - solaris
   goarch:
     - amd64
   ldflags:

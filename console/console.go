@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -30,15 +29,6 @@ type DefaultExecutor struct {
 var _ Executor = DefaultExecutor{}
 
 func New(in io.Reader, out, err io.Writer) Executor {
-	if in == nil {
-		in = os.Stdin
-	}
-	if out == nil {
-		out = os.Stdout
-	}
-	if err == nil {
-		err = os.Stderr
-	}
 	return DefaultExecutor{Stdin: in, Stdout: out, Stderr: err}
 }
 

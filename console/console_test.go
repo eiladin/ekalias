@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"os"
 	"os/exec"
 	"testing"
 
@@ -25,7 +24,7 @@ func (suite ConsoleSuite) TestNew() {
 		reader   io.Reader
 		expected io.Reader
 	}{
-		{expected: os.Stdin},
+		{expected: nil},
 		{reader: &b, expected: &b},
 	}
 
