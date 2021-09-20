@@ -54,4 +54,5 @@ COPY --from=fzf "fzf" "/usr/local/bin/fzf"
 USER vscode
 COPY --from=krew "/home/vscode/.krew/" "/home/vscode/.krew"
 RUN sed -i 's/plugins=(git)/plugins=(git kubectl)/g' ~/.zshrc
+RUN echo "complete -C '/usr/local/aws-cli/v2/current/bin/aws_completer' aws" >> ~/.zshrc
 ENV PATH="/home/vscode/.krew/bin:${PATH}"
