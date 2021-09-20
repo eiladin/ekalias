@@ -7,6 +7,8 @@ import (
 	"github.com/eiladin/ekalias/console"
 )
 
+const executable = "kubectl"
+
 type Kubectl struct {
 	executor console.Executor
 }
@@ -16,7 +18,7 @@ func New(e console.Executor) Kubectl {
 }
 
 func (k Kubectl) FindCli() (string, error) {
-	return k.executor.FindExecutable("kubectl")
+	return k.executor.FindExecutable(executable)
 }
 
 func (k Kubectl) findContexts() ([]string, error) {

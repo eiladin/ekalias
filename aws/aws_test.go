@@ -31,10 +31,10 @@ func (suite AWSSuite) TestNew() {
 func (suite AWSSuite) TestFindCli() {
 	e := new(mocks.Executor)
 	a := New(e)
-	e.On("FindExecutable", "aws").Return("aws", nil)
+	e.On("FindExecutable", executable).Return(executable, nil)
 	res, err := a.FindCli()
 	suite.NoError(err)
-	suite.Equal("aws", res)
+	suite.Equal(executable, res)
 }
 
 func (suite AWSSuite) TestFindProfiles() {
@@ -47,7 +47,7 @@ func (suite AWSSuite) TestFindProfiles() {
 		expectedError        bool
 	}{
 		{
-			findExecutableResult: "aws",
+			findExecutableResult: executable,
 			execCommandResult:    "a\nb\nc",
 			expectedResultLen:    3,
 		},
@@ -58,7 +58,7 @@ func (suite AWSSuite) TestFindProfiles() {
 			expectedError:        true,
 		},
 		{
-			findExecutableResult: "aws",
+			findExecutableResult: executable,
 			execCommandError:     errors.New("exec command error"),
 			expectedError:        true,
 		},
@@ -66,8 +66,8 @@ func (suite AWSSuite) TestFindProfiles() {
 
 	for _, c := range cases {
 		e := new(mocks.Executor)
-		e.On("FindExecutable", "aws").Return(c.findExecutableResult, c.findExecutableError)
-		e.On("ExecCommand", "aws", "configure", "list-profiles").Return(c.execCommandResult, c.execCommandError)
+		e.On("FindExecutable", executable).Return(c.findExecutableResult, c.findExecutableError)
+		e.On("ExecCommand", executable, "configure", "list-profiles").Return(c.execCommandResult, c.execCommandError)
 		a := New(e)
 		res, err := a.findProfiles()
 		if c.expectedError {
@@ -81,8 +81,8 @@ func (suite AWSSuite) TestFindProfiles() {
 
 func (suite AWSSuite) TestProfileExists() {
 	e := new(mocks.Executor)
-	e.On("ExecCommand", "aws", "configure", "list-profiles").Return("a\nb\nc", nil)
-	e.On("FindExecutable", "aws").Return("aws", nil)
+	e.On("ExecCommand", executable, "configure", "list-profiles").Return("a\nb\nc", nil)
+	e.On("FindExecutable", executable).Return(executable, nil)
 	a := New(e)
 
 	cases := []struct {
@@ -99,7 +99,7 @@ func (suite AWSSuite) TestProfileExists() {
 	}
 
 	e = new(mocks.Executor)
-	e.On("FindExecutable", "aws").Return("", errors.New("error"))
+	e.On("FindExecutable", executable).Return("", errors.New("error"))
 	a = New(e)
 	ex := a.profileExists("a")
 	suite.False(ex)
@@ -167,10 +167,10 @@ func (suite AWSSuite) TestCreateProfile() {
 
 	for _, c := range cases {
 		e := mocks.Executor{}
-		e.On("FindExecutable", "aws").Return("aws", c.findExecutableError)
-		e.On("ExecCommand", "aws", "configure", "list-profiles").Return(c.existingProfiles, c.execCommandError)
-		e.On("ExecInteractive", "aws", "configure", "--profile", c.newProfile).Return(c.execInteractiveError)
-		e.On("ExecInteractive", "aws", "configure", "--profile", c.newProfile, "sso").Return(c.execInteractiveError)
+		e.On("FindExecutable", executable).Return(executable, c.findExecutableError)
+		e.On("ExecCommand", executable, "configure", "list-profiles").Return(c.existingProfiles, c.execCommandError)
+		e.On("ExecInteractive", executable, "configure", "--profile", c.newProfile).Return(c.execInteractiveError)
+		e.On("ExecInteractive", executable, "configure", "--profile", c.newProfile, "sso").Return(c.execInteractiveError)
 		if c.sso {
 			e.On("PromptInput", "Use SSO? (only 'yes' will be accepted to approve): ").Return("yes", c.ssoError)
 		} else {
@@ -284,12 +284,12 @@ func (suite AWSSuite) TestCreateKubeContext() {
 	for _, c := range cases {
 		e := new(mocks.Executor)
 		fullClusterName := fmt.Sprintf("arn:aws:eks:%s:accountID:cluster/%s", c.region, c.selectedClusterName)
-		e.On("FindExecutable", "aws").Return("aws", c.findExecutableError)
+		e.On("FindExecutable", executable).Return(executable, c.findExecutableError)
 		e.On("PromptInput", "AWS Region: ").Return(c.region, c.regionError)
 		e.On("PromptInput", "Kube Context Alias: ").Return(c.alias, c.aliasError)
-		e.On("ExecCommand", "aws", "eks", "list-clusters", "--region", c.region).Return(c.clusterlist, c.listClustersError)
-		e.On("ExecCommand", "aws", "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName).Return(fmt.Sprintf("Updated context %s in /home/user/.kube/config", fullClusterName), c.updateConfigError)
-		e.On("ExecCommand", "aws", "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName, "--alias", c.alias).Return(fmt.Sprintf("Updated context %s in /home/user/.kube/config", c.alias), c.updateConfigError)
+		e.On("ExecCommand", executable, "eks", "list-clusters", "--region", c.region).Return(c.clusterlist, c.listClustersError)
+		e.On("ExecCommand", executable, "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName).Return(fmt.Sprintf("Updated context %s in /home/user/.kube/config", fullClusterName), c.updateConfigError)
+		e.On("ExecCommand", executable, "eks", "update-kubeconfig", "--region", c.region, "--name", c.selectedClusterName, "--alias", c.alias).Return(fmt.Sprintf("Updated context %s in /home/user/.kube/config", c.alias), c.updateConfigError)
 		e.On("SelectValueFromList", c.selectList, "Cluster", mock.Anything).Return(c.selectedClusterName, c.selectClusterError)
 		a := New(e)
 
@@ -319,8 +319,8 @@ func (suite AWSSuite) TestSelectProfile() {
 
 	for _, c := range cases {
 		e := new(mocks.Executor)
-		e.On("FindExecutable", "aws").Return("aws", c.findProfilesError)
-		e.On("ExecCommand", "aws", "configure", "list-profiles").Return("a\nb\nc", c.listProfilesError)
+		e.On("FindExecutable", executable).Return(executable, c.findProfilesError)
+		e.On("ExecCommand", executable, "configure", "list-profiles").Return("a\nb\nc", c.listProfilesError)
 		e.On("ReadInput").Return("1", c.selectProfileError)
 		e.On("SelectValueFromList", []string{"a", "b", "c"}, "AWS Profile", mock.Anything).Return("a", c.selectProfileError)
 		a := New(e)

@@ -36,7 +36,7 @@ func (suite KubectlSuite) TestFindContexts() {
 		expectedError        bool
 	}{
 		{
-			findExecutableResult: "kubectl",
+			findExecutableResult: executable,
 			execCommandResult:    "a\nb\nc",
 			expectedResultLen:    3,
 		},
@@ -47,7 +47,7 @@ func (suite KubectlSuite) TestFindContexts() {
 			expectedError:        true,
 		},
 		{
-			findExecutableResult: "kubectl",
+			findExecutableResult: executable,
 			execCommandResult:    "",
 			execCommandError:     errors.New("exec command error"),
 			expectedError:        true,
@@ -56,8 +56,8 @@ func (suite KubectlSuite) TestFindContexts() {
 
 	for _, c := range cases {
 		e := new(mocks.Executor)
-		e.On("FindExecutable", "kubectl").Return(c.findExecutableResult, c.findExecutableError)
-		e.On("ExecCommand", "kubectl", "config", "get-contexts", "-o", "name").Return(c.execCommandResult, c.execCommandError)
+		e.On("FindExecutable", executable).Return(c.findExecutableResult, c.findExecutableError)
+		e.On("ExecCommand", executable, "config", "get-contexts", "-o", "name").Return(c.execCommandResult, c.execCommandError)
 		k := New(e)
 
 		res, err := k.findContexts()
@@ -72,8 +72,8 @@ func (suite KubectlSuite) TestFindContexts() {
 
 func (suite KubectlSuite) TestSelectContext() {
 	e := new(mocks.Executor)
-	e.On("FindExecutable", "kubectl").Return("kubectl", nil)
-	e.On("ExecCommand", "kubectl", "config", "get-contexts", "-o", "name").Return("a\nb\nc", nil)
+	e.On("FindExecutable", executable).Return(executable, nil)
+	e.On("ExecCommand", executable, "config", "get-contexts", "-o", "name").Return("a\nb\nc", nil)
 	e.On("ReadInput").Return("2", nil)
 	e.On("SelectValueFromList", []string{"a", "b", "c"}, "Kube Context", mock.Anything).Return("b", nil)
 	k := New(e)
@@ -82,7 +82,7 @@ func (suite KubectlSuite) TestSelectContext() {
 	suite.Equal("b", res)
 
 	e = new(mocks.Executor)
-	e.On("FindExecutable", "kubectl").Return("", errors.New("error"))
+	e.On("FindExecutable", executable).Return("", errors.New("error"))
 	k = New(e)
 	res, err = k.SelectContext()
 	suite.Error(err)
@@ -94,13 +94,13 @@ func (suite KubectlSuite) TestFindCli() {
 		cmd string
 		err error
 	}{
-		{cmd: "kubectl"},
+		{cmd: executable},
 		{err: errors.New("error")},
 	}
 
 	for _, c := range cases {
 		e := new(mocks.Executor)
-		e.On("FindExecutable", "kubectl").Return(c.cmd, c.err)
+		e.On("FindExecutable", executable).Return(c.cmd, c.err)
 		k := New(e)
 		res, err := k.FindCli()
 		if c.err == nil {

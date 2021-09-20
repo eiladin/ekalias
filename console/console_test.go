@@ -19,19 +19,15 @@ func TestConsoleSuite(t *testing.T) {
 }
 
 func (suite ConsoleSuite) TestNew() {
-	b := bytes.Buffer{}
-	cases := []struct {
-		reader   io.Reader
-		expected io.Reader
-	}{
-		{expected: nil},
-		{reader: &b, expected: &b},
-	}
+	in := bytes.Buffer{}
+	out := bytes.Buffer{}
+	err := bytes.Buffer{}
 
-	for _, c := range cases {
-		e := New(c.reader, nil, nil).(DefaultExecutor)
-		suite.Equal(c.expected, e.Stdin)
-	}
+	e := New(&in, &out, &err).(DefaultExecutor)
+
+	suite.Equal(&in, e.Stdin)
+	suite.Equal(&out, e.Stdin)
+	suite.Equal(&err, e.Stdin)
 }
 
 func (suite ConsoleSuite) TestBuildAlias() {

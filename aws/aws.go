@@ -9,6 +9,8 @@ import (
 	"github.com/eiladin/ekalias/console"
 )
 
+const executable = "aws"
+
 var ErrProfileSpaces = errors.New("profile name cannot have spaces")
 var ErrProfileExists = errors.New("profile name already exists")
 var ErrNoClusters = errors.New("no clusters in selected account/region")
@@ -22,7 +24,7 @@ func New(e console.Executor) AWS {
 }
 
 func (aws AWS) FindCli() (string, error) {
-	return aws.executor.FindExecutable("aws")
+	return aws.executor.FindExecutable(executable)
 }
 
 func (aws AWS) findProfiles() ([]string, error) {
