@@ -46,22 +46,9 @@ func (suite AWSSuite) TestFindProfiles() {
 		expectedResultLen    int
 		expectedError        bool
 	}{
-		{
-			findExecutableResult: executable,
-			execCommandResult:    "a\nb\nc",
-			expectedResultLen:    3,
-		},
-		{
-			findExecutableResult: "",
-			findExecutableError:  errors.New("find executable error"),
-			execCommandResult:    "a\nb\nc",
-			expectedError:        true,
-		},
-		{
-			findExecutableResult: executable,
-			execCommandError:     errors.New("exec command error"),
-			expectedError:        true,
-		},
+		{findExecutableResult: executable, execCommandResult: "a\nb\nc", expectedResultLen: 3},
+		{findExecutableResult: "", findExecutableError: errors.New("find executable error"), execCommandResult: "a\nb\nc", expectedError: true},
+		{findExecutableResult: executable, execCommandError: errors.New("exec command error"), expectedError: true},
 	}
 
 	for _, c := range cases {
@@ -117,52 +104,15 @@ func (suite AWSSuite) TestCreateProfile() {
 		readInputErr         error
 		shouldErr            bool
 	}{
-		{
-			existingProfiles: "1\n2\n3",
-			newProfile:       "a",
-		},
-		{
-			existingProfiles: "1\n2\n3",
-			newProfile:       "a",
-			sso:              true,
-		},
-		{
-			existingProfiles: "1\n2\n3",
-			newProfile:       "a",
-			sso:              true,
-			ssoError:         errors.New("test"),
-			shouldErr:        true,
-		},
-		{
-			existingProfiles: "a\n\b\nc",
-			newProfile:       "a",
-			shouldErr:        true,
-		},
-		{
-			existingProfiles: "a\n\b\nc",
-			newProfile:       "a b",
-			shouldErr:        true,
-		},
-		{
-			existingProfiles:     "a\n\b\nc",
-			newProfile:           "ab",
-			execInteractiveError: errors.New("test"),
-			shouldErr:            true,
-		},
-		{
-			readInputErr: errors.New("test"),
-			shouldErr:    true,
-		},
-		{
-			newProfile:          "ab",
-			findExecutableError: errors.New("test"),
-			shouldErr:           true,
-		},
-		{
-			newProfile:           "ab",
-			execInteractiveError: errors.New("test"),
-			shouldErr:            true,
-		},
+		{existingProfiles: "1\n2\n3", newProfile: "a"},
+		{existingProfiles: "1\n2\n3", newProfile: "a", sso: true},
+		{existingProfiles: "1\n2\n3", newProfile: "a", sso: true, ssoError: errors.New("test"), shouldErr: true},
+		{existingProfiles: "a\n\b\nc", newProfile: "a", shouldErr: true},
+		{existingProfiles: "a\n\b\nc", newProfile: "a b", shouldErr: true},
+		{existingProfiles: "a\n\b\nc", newProfile: "ab", execInteractiveError: errors.New("test"), shouldErr: true},
+		{readInputErr: errors.New("test"), shouldErr: true},
+		{newProfile: "ab", findExecutableError: errors.New("test"), shouldErr: true},
+		{newProfile: "ab", execInteractiveError: errors.New("test"), shouldErr: true},
 	}
 
 	for _, c := range cases {
